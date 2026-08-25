@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - IA Veterinária</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            resize: vertical;
+            font-family: inherit;
+        }
+        select, button {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .response-container {
+            margin-top: 20px;
+            background-color: #272822;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        pre {
+            margin: 0;
+            font-size: 14px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 15px;
+            color: #007bff;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Teste Rápido - IA Veterinária</h1>
+    
+    <div class="form-group">
+        <label for="endpoint">Qual funcionalidade testar?</label>
+        <select id="endpoint">
+            <option value="/api/v1/assistant/parse-scheduling">Agendamento Inteligente (Scheduling)</option>
+            <option value="/api/v1/assistant/parse-intent">Pós-Atendimento (Post-Care)</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="prompt">Mensagem / Comando (Linguagem Natural):</label>
+        <textarea id="prompt" placeholder="Ex: Quero marcar o retorno do Thor daqui a 7 dias, de preferência à tarde..."></textarea>
+    </div>
+
+    <button id="sendBtn" onclick="sendRequest()">Enviar para IA</button>
+    <div id="loading" class="loading">Processando com o Gemini...</div>
+
+    <div class="response-container">
+        <label>Resposta Estruturada (JSON):</label>
+        <pre id="jsonResponse">Aguardando requisição...</pre>
+    </div>
+</div>
+
+<script>
+    async function sendRequest() {
+        const endpoint = document.getElementById('endpoint').value;
+        const promptText = document.getElementById('prompt').value;
+        const jsonResponse = document.getElementById('jsonResponse');
+        const sendBtn = document.getElementById('sendBtn');
+        const loading = document.getElementById('loading');
+
+        if (!promptText.trim()) {
+            alert("Por favor, digite uma mensagem.");
+            return;
+        }
+
+        // UI Feedback
+        sendBtn.disabled = true;
+        loading.style.display = "block";
+        jsonResponse.textContent = "Aguardando resposta...";
+
+        try {
+            const response = await fetch(`http://localhost:8000${endpoint}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ prompt: promptText })
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                jsonResponse.textContent = JSON.stringify(data, null, 4);
+            } else {
+                jsonResponse.textContent = `ERRO (${response.status}):\n${JSON.stringify(data, null, 4)}`;
+            }
+        } catch (error) {
+            jsonResponse.textContent = `ERRO DE REDE: ${error.message}\nCertifique-se de que a API (main.py) está rodando.`;
+        } finally {
+            // Restore UI
+            sendBtn.disabled = false;
+            loading.style.display = "none";
+        }
+    }
+</script>
+
+</body>
+</html>
