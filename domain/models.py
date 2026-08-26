@@ -1,6 +1,10 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 
+class ConversationMessage(BaseModel):
+    role: str = Field(description="O papel do autor da mensagem: 'user' ou 'assistant'")
+    text: str = Field(description="O conteúdo da mensagem")
+
 class ClinicalPostCarePlan(BaseModel):
     pet_name: Optional[str] = Field(description="Nome do pet, se mencionado.")
     tutor_name: Optional[str] = Field(description="Nome do tutor, se mencionado.")
@@ -21,6 +25,7 @@ class SchedulingIntent(BaseModel):
 
 class TriageInboundRequest(BaseModel):
     message: str
+    history: Optional[list[ConversationMessage]] = None
     pet_id: Optional[str] = None
     tutor_id: Optional[str] = None
     clinic_id: Optional[str] = None
@@ -37,6 +42,7 @@ class TriageResult(BaseModel):
 
 class CheckinResponseRequest(BaseModel):
     message: str
+    history: Optional[list[ConversationMessage]] = None
     pet_id: Optional[str] = None
     tutor_id: Optional[str] = None
     clinic_id: Optional[str] = None

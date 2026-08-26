@@ -70,6 +70,9 @@ async def triage_inbound(request: TriageInboundRequest, use_case: ProcessTriageI
         # Remove empty contexts
         context = {k: v for k, v in context.items() if v is not None}
         
+        if request.history:
+            context["history"] = [msg.model_dump() for msg in request.history]
+            
         result = use_case.execute(request.message, context)
         return result
     except ProcessTriageIntentUseCaseError as e:
@@ -100,6 +103,9 @@ async def parse_checkin_response(request: CheckinResponseRequest, use_case: Proc
         # Remove empty contexts
         context = {k: v for k, v in context.items() if v is not None}
         
+        if request.history:
+            context["history"] = [msg.model_dump() for msg in request.history]
+            
         result = use_case.execute(request.message, context)
         return result
     except ProcessCheckinIntentUseCaseError as e:

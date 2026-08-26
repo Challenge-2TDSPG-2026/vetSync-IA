@@ -73,7 +73,14 @@ class GeminiGateway(IAssistantGateway):
 
     def parse_triage_intent(self, prompt: str, context: dict = None) -> TriageResult:
         try:
-            full_prompt = f"Contexto opcional: {json.dumps(context)}\n\nMensagem do tutor: {prompt}" if context else prompt
+            full_prompt = ""
+            if context and "history" in context:
+                history = context.pop("history")
+                history_text = "\n".join([f"{msg['role'].capitalize()}: {msg['text']}" for msg in history])
+                full_prompt += f"Histórico de mensagens:\n{history_text}\n\n"
+                
+            full_prompt += f"Contexto opcional: {json.dumps(context)}\n\n" if context else ""
+            full_prompt += f"Mensagem atual do tutor: {prompt}"
             response = self.client.models.generate_content(
                 model=self.model_id,
                 contents=full_prompt,
@@ -96,7 +103,14 @@ class GeminiGateway(IAssistantGateway):
 
     def parse_checkin_intent(self, prompt: str, context: dict = None) -> CheckinResult:
         try:
-            full_prompt = f"Contexto opcional: {json.dumps(context)}\n\nMensagem do tutor: {prompt}" if context else prompt
+            full_prompt = ""
+            if context and "history" in context:
+                history = context.pop("history")
+                history_text = "\n".join([f"{msg['role'].capitalize()}: {msg['text']}" for msg in history])
+                full_prompt += f"Histórico de mensagens:\n{history_text}\n\n"
+                
+            full_prompt += f"Contexto opcional: {json.dumps(context)}\n\n" if context else ""
+            full_prompt += f"Mensagem atual do tutor: {prompt}"
             response = self.client.models.generate_content(
                 model=self.model_id,
                 contents=full_prompt,
