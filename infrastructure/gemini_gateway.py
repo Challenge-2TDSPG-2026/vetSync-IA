@@ -4,15 +4,13 @@ from google import genai
 from google.genai import types
 from domain.models import ClinicalPostCarePlan, SchedulingIntent
 from infrastructure.prompts import SCHEDULE_SYSTEM_INSTRUCTION
+from application.ports import IAssistantGateway, AssistantGatewayError
 
-class GeminiGatewayError(Exception):
-    pass
-
-class GeminiGateway:
+class GeminiGateway(IAssistantGateway):
     def __init__(self):
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            raise GeminiGatewayError("GEMINI_API_KEY environment variable is missing.")
+            raise AssistantGatewayError("GEMINI_API_KEY environment variable is missing.")
         
         self.client = genai.Client(api_key=api_key)
         self.model_id = 'gemini-3.6-flash'
@@ -43,13 +41,13 @@ class GeminiGateway:
             )
             
             if not response.text:
-                raise GeminiGatewayError("API returned empty text.")
+                raise AssistantGatewayError("API returned empty text.")
                 
             data = json.loads(response.text)
             return ClinicalPostCarePlan(**data)
             
         except Exception as e:
-            raise GeminiGatewayError(f"Erro ao processar intent no Gemini: {str(e)}")
+            raise AssistantGatewayError(f"Erro ao processar intent no Gemini: {str(e)}")
 
     def parse_scheduling_intent(self, prompt: str) -> SchedulingIntent:
         try:
@@ -65,10 +63,10 @@ class GeminiGateway:
             )
             
             if not response.text:
-                raise GeminiGatewayError("API returned empty text for scheduling.")
+                raise AssistantGatewayError("API returned empty text for scheduling.")
                 
             data = json.loads(response.text)
             return SchedulingIntent(**data)
             
         except Exception as e:
-            raise GeminiGatewayError(f"Erro ao processar intent de agendamento no Gemini: {str(e)}")
+            raise AssistantGatewayError(f"Erro ao processar intent de agendamento no Gemini: {str(e)}")

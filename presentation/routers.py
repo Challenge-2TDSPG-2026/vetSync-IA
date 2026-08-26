@@ -2,15 +2,23 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from application.use_cases import ProcessPostCareIntentUseCase, ProcessPostCareIntentUseCaseError, ProcessSchedulingIntentUseCase, ProcessSchedulingIntentUseCaseError
 from domain.models import ClinicalPostCarePlan, SchedulingIntent
+from application.ports import IAssistantGateway
+from infrastructure.gemini_gateway import GeminiGateway
 
 router = APIRouter(prefix="/api/v1/assistant", tags=["Assistant"])
 
 class IntentRequest(BaseModel):
     prompt: str
 
-def get_use_case() -> ProcessPostCareIntentUseCase:
+def get_gateway() -> IAssistantGateway:
     try:
-        return ProcessPostCareIntentUseCase()
+        return GeminiGateway()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao inicializar IA: {str(e)}")
+
+def get_use_case(gateway: IAssistantGateway = Depends(get_gateway)) -> ProcessPostCareIntentUseCase:
+    try:
+        return ProcessPostCareIntentUseCase(gateway=gateway)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -24,9 +32,9 @@ async def parse_intent(request: IntentRequest, use_case: ProcessPostCareIntentUs
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-def get_scheduling_use_case() -> ProcessSchedulingIntentUseCase:
+def get_scheduling_use_case(gateway: IAssistantGateway = Depends(get_gateway)) -> ProcessSchedulingIntentUseCase:
     try:
-        return ProcessSchedulingIntentUseCase()
+        return ProcessSchedulingIntentUseCase(gateway=gateway)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
