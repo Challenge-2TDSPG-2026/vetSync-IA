@@ -46,6 +46,39 @@ A IA processa o texto e retorna a intenção de agendamento categorizada:
 
 ---
 
+## 3. Triagem e Classificação de Risco no Chat do Tutor (`/triage-inbound`)
+
+Esta funcionalidade atua como a primeira linha de atendimento para mensagens enviadas por tutores através do WhatsApp ou chat da clínica. A SIA **não faz diagnósticos ou prescrições**, mas identifica sinais de risco e classifica a urgência para guiar o fluxo interno de atendimento.
+
+### Como funciona:
+O tutor envia uma mensagem informando o estado do animal, como por exemplo:
+> *"Meu cachorro foi picado por uma abelha, o focinho dele está muito inchado e ele está com dificuldade pra respirar."*
+
+A IA processa o relato e retorna:
+- **`urgency_level`**: Nível de urgência (`EMERGENCIA`, `URGENCIA`, `ROTINA`, `ADMINISTRATIVO`). Há uma instrução rígida para a IA agir de forma conservadora (optar pelo mais grave em caso de dúvida).
+- **`identified_symptoms`**: Lista de sintomas efetivamente relatados (ex: `["edema facial", "dificuldade respiratória"]`).
+- **`suggested_action`**: Orientação do fluxo da clínica (ex: "Encaminhar imediatamente para atendimento presencial").
+- **`auto_reply_draft`**: Resposta segura e objetiva a ser devolvida ao tutor.
+- **`notify_team`**: Booleano (`true`/`false`) que sinaliza para o backend se a equipe precisa ser alertada imediatamente.
+
+---
+
+## 4. Monitoramento Ativo de Recuperação Pós-Cirúrgica (`/parse-checkin-response`)
+
+Esta funcionalidade tem como objetivo analisar as respostas de tutores durante o acompanhamento (check-in) pós-operatório. A IA detecta sinais normais de cicatrização ou alertas de complicações para que o médico atue no momento correto.
+
+### Como funciona:
+O tutor responde a uma mensagem de acompanhamento:
+> *"Ele tomou o remédio, mas o corte da cirurgia tá saindo um líquido amarelo e ele tá meio prostrado."*
+
+A IA estruturará o relato retornando:
+- **`recovery_status`**: Estado atualizado (`NORMAL`, `ALERTA_MODERADO`, `COMPLICACAO_CRITICA`).
+- **`red_flags`**: Identificadores de risco baseados no relato do tutor (ex: `["secreção na incisão", "prostração"]`).
+- **`notify_veterinarian`**: Booleano indicando que um humano precisa atuar no caso.
+- **`message_draft`**: Rascunho para dar vazão à interação com o tutor.
+
+---
+
 ## Comportamentos Comuns e Limites da IA (Guardrails)
 
 Ambas as integrações compartilham restrições de comportamento configuradas nas "System Instructions":

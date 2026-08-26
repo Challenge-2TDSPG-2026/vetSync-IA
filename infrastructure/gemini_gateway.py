@@ -2,8 +2,8 @@ import os
 import json
 from google import genai
 from google.genai import types
-from domain.models import ClinicalPostCarePlan, SchedulingIntent
-from infrastructure.prompts import SCHEDULE_SYSTEM_INSTRUCTION
+from domain.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, CheckinResult
+from infrastructure.prompts import SCHEDULE_SYSTEM_INSTRUCTION, TRIAGE_SYSTEM_INSTRUCTION, CHECKIN_SYSTEM_INSTRUCTION
 from application.ports import IAssistantGateway, AssistantGatewayError
 
 class GeminiGateway(IAssistantGateway):
@@ -70,3 +70,49 @@ class GeminiGateway(IAssistantGateway):
             
         except Exception as e:
             raise AssistantGatewayError(f"Erro ao processar intent de agendamento no Gemini: {str(e)}")
+
+    def parse_triage_intent(self, prompt: str, context: dict = None) -> TriageResult:
+        try:
+            full_prompt = f"Contexto opcional: {json.dumps(context)}\n\nMensagem do tutor: {prompt}" if context else prompt
+            response = self.client.models.generate_content(
+                model=self.model_id,
+                contents=full_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=TRIAGE_SYSTEM_INSTRUCTION,
+                    response_mime_type="application/json",
+                    response_schema=TriageResult,
+                    temperature=0.2,
+                )
+            )
+            
+            if not response.text:
+                raise AssistantGatewayError("API returned empty text for triage.")
+                
+            data = json.loads(response.text)
+            return TriageResult(**data)
+            
+        except Exception as e:
+            raise AssistantGatewayError(f"Erro ao processar intent de triagem no Gemini: {str(e)}")
+
+    def parse_checkin_intent(self, prompt: str, context: dict = None) -> CheckinResult:
+        try:
+            full_prompt = f"Contexto opcional: {json.dumps(context)}\n\nMensagem do tutor: {prompt}" if context else prompt
+            response = self.client.models.generate_content(
+                model=self.model_id,
+                contents=full_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=CHECKIN_SYSTEM_INSTRUCTION,
+                    response_mime_type="application/json",
+                    response_schema=CheckinResult,
+                    temperature=0.2,
+                )
+            )
+            
+            if not response.text:
+                raise AssistantGatewayError("API returned empty text for checkin.")
+                
+            data = json.loads(response.text)
+            return CheckinResult(**data)
+            
+        except Exception as e:
+            raise AssistantGatewayError(f"Erro ao processar intent de checkin no Gemini: {str(e)}")

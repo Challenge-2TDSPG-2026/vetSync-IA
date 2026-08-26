@@ -34,6 +34,29 @@ class MockAssistantGateway(IAssistantGateway):
             message_draft="Quais os horários livres hoje a tarde?"
         )
 
+    def parse_triage_intent(self, prompt: str, context: dict = None):
+        from domain.models import TriageResult
+        if self.fail:
+            raise AssistantGatewayError("Erro simulado")
+        return TriageResult(
+            urgency_level="EMERGENCIA",
+            identified_symptoms=["dor"],
+            suggested_action="Ação",
+            auto_reply_draft="Rascunho",
+            notify_team=True
+        )
+
+    def parse_checkin_intent(self, prompt: str, context: dict = None):
+        from domain.models import CheckinResult
+        if self.fail:
+            raise AssistantGatewayError("Erro simulado")
+        return CheckinResult(
+            recovery_status="ALERTA_MODERADO",
+            red_flags=["febre"],
+            notify_veterinarian=True,
+            message_draft="Rascunho checkin"
+        )
+
 client = TestClient(app)
 
 def override_get_gateway_success():

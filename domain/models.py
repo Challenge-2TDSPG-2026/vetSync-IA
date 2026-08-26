@@ -18,3 +18,35 @@ class SchedulingIntent(BaseModel):
     patient_name: Optional[str] = Field(description="Nome do paciente, se mencionado")
     state: Optional[str] = Field(description="Estado sugerido do agendamento (PENDENTE_DOUTOR, CONFIRMADO_DOUTOR, AGUARDANDO_TUTOR, etc.)")
     message_draft: str = Field(description="Resposta sugerida da IA para o doutor ou tutor")
+
+class TriageInboundRequest(BaseModel):
+    message: str
+    pet_id: Optional[str] = None
+    tutor_id: Optional[str] = None
+    clinic_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+    patient_species: Optional[str] = None
+    patient_name: Optional[str] = None
+
+class TriageResult(BaseModel):
+    urgency_level: str = Field(description="Nível de urgência: EMERGENCIA, URGENCIA, ROTINA, ADMINISTRATIVO")
+    identified_symptoms: list[str] = Field(description="Lista de sintomas extraídos")
+    suggested_action: str = Field(description="Próximo passo operacional da clínica")
+    auto_reply_draft: str = Field(description="Rascunho de mensagem para o tutor")
+    notify_team: bool = Field(description="Verdadeiro se a equipe precisar ser notificada (ex: emergência)")
+
+class CheckinResponseRequest(BaseModel):
+    message: str
+    pet_id: Optional[str] = None
+    tutor_id: Optional[str] = None
+    clinic_id: Optional[str] = None
+    veterinarian_id: Optional[str] = None
+    surgery_id: Optional[str] = None
+    days_post_surgery: Optional[int] = None
+    conversation_id: Optional[str] = None
+
+class CheckinResult(BaseModel):
+    recovery_status: str = Field(description="Estado da recuperação: NORMAL, ALERTA_MODERADO, COMPLICACAO_CRITICA")
+    red_flags: list[str] = Field(description="Sinais de complicação identificados")
+    notify_veterinarian: bool = Field(description="Verdadeiro se o veterinário deve ser notificado")
+    message_draft: str = Field(description="Rascunho de mensagem para o tutor")

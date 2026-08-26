@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from presentation.routers import router
+from presentation.routers import router, triage_router, checkin_router
 from dotenv import load_dotenv
 
 # Carrega variáveis de ambiente
@@ -22,6 +22,8 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(triage_router)
+app.include_router(checkin_router)
 
 @app.get("/health")
 async def health_check():

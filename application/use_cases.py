@@ -1,4 +1,4 @@
-from domain.models import ClinicalPostCarePlan, SchedulingIntent
+from domain.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, CheckinResult
 from application.ports import IAssistantGateway, AssistantGatewayError
 
 class ProcessPostCareIntentUseCaseError(Exception):
@@ -36,3 +36,39 @@ class ProcessSchedulingIntentUseCase:
             raise ProcessSchedulingIntentUseCaseError(f"Falha na integração: {str(e)}")
         except Exception as e:
             raise ProcessSchedulingIntentUseCaseError(f"Erro inesperado: {str(e)}")
+
+class ProcessTriageIntentUseCaseError(Exception):
+    pass
+
+class ProcessTriageIntentUseCase:
+    def __init__(self, gateway: IAssistantGateway):
+        self.gateway = gateway
+        
+    def execute(self, prompt: str, context: dict = None) -> TriageResult:
+        if not prompt or not prompt.strip():
+            raise ProcessTriageIntentUseCaseError("A mensagem não pode estar vazia.")
+            
+        try:
+            return self.gateway.parse_triage_intent(prompt, context)
+        except AssistantGatewayError as e:
+            raise ProcessTriageIntentUseCaseError(f"Falha na integração: {str(e)}")
+        except Exception as e:
+            raise ProcessTriageIntentUseCaseError(f"Erro inesperado: {str(e)}")
+
+class ProcessCheckinIntentUseCaseError(Exception):
+    pass
+
+class ProcessCheckinIntentUseCase:
+    def __init__(self, gateway: IAssistantGateway):
+        self.gateway = gateway
+        
+    def execute(self, prompt: str, context: dict = None) -> CheckinResult:
+        if not prompt or not prompt.strip():
+            raise ProcessCheckinIntentUseCaseError("A mensagem não pode estar vazia.")
+            
+        try:
+            return self.gateway.parse_checkin_intent(prompt, context)
+        except AssistantGatewayError as e:
+            raise ProcessCheckinIntentUseCaseError(f"Falha na integração: {str(e)}")
+        except Exception as e:
+            raise ProcessCheckinIntentUseCaseError(f"Erro inesperado: {str(e)}")
