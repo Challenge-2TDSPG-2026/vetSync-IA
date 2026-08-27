@@ -1,4 +1,4 @@
-from domain.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, CheckinResult
+from domain.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, CheckinResult, OrchestratorResult
 from application.ports import IAssistantGateway, AssistantGatewayError
 
 class ProcessPostCareIntentUseCaseError(Exception):
@@ -72,3 +72,21 @@ class ProcessCheckinIntentUseCase:
             raise ProcessCheckinIntentUseCaseError(f"Falha na integração: {str(e)}")
         except Exception as e:
             raise ProcessCheckinIntentUseCaseError(f"Erro inesperado: {str(e)}")
+
+class ProcessOrchestratorIntentUseCaseError(Exception):
+    pass
+
+class ProcessOrchestratorIntentUseCase:
+    def __init__(self, gateway: IAssistantGateway):
+        self.gateway = gateway
+        
+    def execute(self, prompt: str) -> 'OrchestratorResult':
+        if not prompt or not prompt.strip():
+            raise ProcessOrchestratorIntentUseCaseError("A mensagem não pode estar vazia.")
+            
+        try:
+            return self.gateway.orchestrate_intent(prompt)
+        except AssistantGatewayError as e:
+            raise ProcessOrchestratorIntentUseCaseError(f"Falha na integração: {str(e)}")
+        except Exception as e:
+            raise ProcessOrchestratorIntentUseCaseError(f"Erro inesperado: {str(e)}")

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from domain.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, CheckinResult
+from domain.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, CheckinResult, OrchestratorResult
 
 class AssistantGatewayError(Exception):
     """Exceção base para erros de integração com a IA."""
@@ -20,4 +20,8 @@ class IAssistantGateway(ABC):
         
     @abstractmethod
     def parse_checkin_intent(self, prompt: str, context: dict = None) -> CheckinResult:
+        pass
+
+    @abstractmethod
+    def orchestrate_intent(self, prompt: str) -> 'OrchestratorResult':
         pass

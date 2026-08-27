@@ -56,3 +56,7 @@ class CheckinResult(BaseModel):
     red_flags: list[str] = Field(description="Sinais de complicação identificados")
     notify_veterinarian: bool = Field(description="Verdadeiro se o veterinário deve ser notificado")
     message_draft: str = Field(description="Rascunho de mensagem para o tutor")
+
+class OrchestratorResult(BaseModel):
+    intent_category: str = Field(description="A categoria da intenção: AGENDAMENTO, TRIAGEM, POS_ATENDIMENTO, CHECKIN, ou OUTRO")
+    reasoning: str = Field(description="O motivo da classificação")

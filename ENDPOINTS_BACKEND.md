@@ -1,71 +1,52 @@
-# Documentação de Endpoints: Integração IA -> Backend Principal
+# Documentação de Endpoints: API Assistente Veterinário (vetSync-IA)
 
-Este documento detalha os endpoints que precisam ser desenvolvidos no **Backend Principal** para consumir os dados estruturados gerados pela Inteligência Artificial e realizar as devidas manipulações no banco de dados.
+Este documento detalha os endpoints disponíveis na aplicação atual, desenvolvida em **FastAPI**. A API utiliza Inteligência Artificial (Google GenAI) para interpretar comandos em linguagem natural e estruturar planos de pós-atendimento, triagem, check-ins e agendamentos.
 
----
-
-## 1. Para a funcionalidade de Agendamento (`SchedulingIntent`)
-
-A IA retorna intenções como `RESERVAR`, `CANCELAR`, `CONFIRMAR` ou `CONSULTAR`. Seu backend principal precisará dos seguintes endpoints para manipular o banco:
-
-*   **`GET /api/v1/ia/agendamentos/disponibilidade`**
-    *   **Objetivo:** Consultar horários livres de um veterinário em uma data específica.
-    *   **Uso:** Quando a IA identificar a intenção `CONSULTAR` (ex: "Quais horários livres amanhã?"), seu sistema baterá nesse endpoint.
-
-*   **`POST /api/v1/ia/agendamentos`**
-    *   **Objetivo:** Inserir uma nova consulta no banco.
-    *   **Uso:** Recebe o `date_reference`, `time_reference`, `doctor_name` e `patient_name` estruturados pela IA quando a intenção for `RESERVAR`.
-
-*   **`PATCH /api/v1/ia/agendamentos/{id}/status`**
-    *   **Objetivo:** Atualizar o estado lógico do evento (`state`) no banco.
-    *   **Uso:** Acionado quando a intenção mapeada for `CONFIRMAR` (ex: atualizar para `CONFIRMADO_TUTOR`) ou `CANCELAR` (atualizar para `CANCELADO`).
-
-*   **`PUT /api/v1/ia/agendamentos/{id}/reagendar`**
-    *   **Objetivo:** Modificar a data/hora de um registro já existente no banco de dados (Intenção: `REAGENDAR`).
+Atualmente, o projeto está estruturado em duas categorias principais de endpoints:
+1. **Módulo IA + Oracle:** Novas rotas que, além de interpretar a intenção com a IA, já preparam a lógica de persistência e manipulação no banco de dados Oracle.
+2. **Módulo Assistant (Apenas processamento de IA):** Rotas originais que recebem o texto e retornam a estrutura JSON gerada pela IA, sem manipulação de banco de dados.
 
 ---
 
-## 2. Para o Pós-Atendimento e Prontuário (`ClinicalPostCarePlan`)
+## 1. Módulo IA + Oracle (Integração com Banco de Dados)
 
-A IA extrai o tempo de retorno (`days_until_follow_up`), motivo e necessidade de receita.
+Estas rotas cuidam de receber os dados do front-end/tutor, interpretá-los usando a Inteligência Artificial e tomar a decisão apropriada no banco de dados (inserir, atualizar, cancelar).
 
-*   **`POST /api/v1/ia/atendimentos/{id}/retorno`**
-    *   **Objetivo:** Criar um agendamento futuro vinculado ao prontuário.
-    *   **Uso:** Você pegará a variável `days_until_follow_up` (ex: 7), somará com a data atual no seu backend, e fará o insert no banco para travar a agenda do médico.
+### Agendamentos (`SchedulingIntent`)
+*   **`POST /api/v1/ia/agendamentos/processar`**
+    *   **Objetivo:** Recebe uma mensagem em texto livre do tutor, passa pela IA para estruturar, e toma a ação no banco de dados Oracle baseada na intenção (`RESERVAR`, `CANCELAR`, `CONFIRMAR`, `CONSULTAR`).
+    *   **Exemplo de Payload:** `{"prompt": "Quero marcar consulta amanhã as 14h"}`
 
-*   **`PATCH /api/v1/ia/atendimentos/{id}`**
-    *   **Objetivo:** Atualizar o banco de dados do prontuário indicando pendências.
-    *   **Uso:** Atualiza flags no banco utilizando os booleanos `attach_prescription` e `attach_medical_record` que a IA encontrou.
+### Pós-Atendimento e Prontuário (`ClinicalPostCarePlan`)
+*   **`POST /api/v1/ia/atendimentos/processar`**
+    *   **Objetivo:** Recebe instruções médicas do veterinário (ex: áudio transcrito ou texto corrido), a IA estrutura o prontuário e salva as pendências ou agenda o retorno no Oracle.
+    *   **Exemplo de Payload:** `{"prompt": "Animal bem, pedir para voltar daqui a 7 dias e prescrever dipirona"}`
 
----
+### Triagem de Risco (`TriageResult`)
+*   **`POST /api/v1/ia/triagens/processar`**
+    *   **Objetivo:** Recebe os sintomas descritos pelo tutor antes de chegar na clínica. A IA classifica o risco (ex: `EMERGENCIA`, `NORMAL`), salva a triagem no Oracle e sinaliza alertas para a equipe se necessário.
+    *   **Exemplo de Payload:** `{"message": "Meu cachorro foi atropelado e está vomitando", "pet_id": "123", "patient_species": "CACHORRO"}`
 
-## 3. Para a Triagem de Risco (`TriageResult`)
-
-A IA classifica a urgência e extrai sintomas.
-
-*   **`POST /api/v1/ia/triagens`** (ou `POST /api/v1/ia/pre-atendimentos`)
-    *   **Objetivo:** Criar um novo registro no banco de dados com a classificação de risco do animal antes mesmo dele chegar à clínica.
-    *   **Uso:** Inserir o `urgency_level`, os `identified_symptoms` (array) e atrelar aos IDs do tutor e do pet.
-
-*   **`POST /api/v1/ia/notificacoes/equipe`**
-    *   **Objetivo:** Disparar avisos e persistir logs de alerta.
-    *   **Uso:** O sistema deve chamar este endpoint se a propriedade `notify_team` for `True` (ex: `EMERGENCIA`).
+### Check-in Pós-Cirúrgico (`CheckinResult`)
+*   **`POST /api/v1/ia/checkins/processar`**
+    *   **Objetivo:** Recebe relatos do tutor sobre a recuperação em casa. A IA extrai o status e eventuais complicações (*red flags*), gravando na linha do tempo do paciente (histórico da cirurgia) no Oracle.
+    *   **Exemplo de Payload:** `{"message": "A ferida está com pus e quente", "surgery_id": "456", "days_post_surgery": 2}`
 
 ---
 
-## 4. Para o Check-in Pós-Cirúrgico (`CheckinResult`)
+## 2. Módulo Assistant (Somente IA - Sem Banco de Dados)
 
-A IA extrai o status da recuperação e *red flags* baseada nos relatos do tutor.
+Rotas de base originais da aplicação que apenas utilizam o *Gateway* de IA (`GeminiGateway`) para interpretar intenções em texto livre e retornar a tipagem Pydantic (JSON) correspondente.
 
-*   **`POST /api/v1/ia/cirurgias/{id}/checkins`**
-    *   **Objetivo:** Gravar uma nova entrada na linha do tempo da recuperação do paciente.
-    *   **Uso:** Recebe o `recovery_status` (ex: `COMPLICACAO_CRITICA`) e os `red_flags` para salvar no histórico clínico do banco de dados.
+*   **`POST /api/v1/assistant/parse-intent`**
+    *   Estrutura planos clínicos de pós-atendimento. Retorna um objeto do tipo `ClinicalPostCarePlan`.
+*   **`POST /api/v1/assistant/parse-scheduling`**
+    *   Interpreta intenções de agenda do tutor. Retorna um objeto do tipo `SchedulingIntent`.
+*   **`POST /triage-inbound`**
+    *   Classifica o nível de risco a partir dos sintomas informados. Retorna um objeto do tipo `TriageResult`.
+*   **`POST /parse-checkin-response`**
+    *   Avalia a recuperação de um paciente recém-operado. Retorna um objeto do tipo `CheckinResult`.
 
 ---
 
-## 5. Para a Mensageria (Transversal a todas as features)
-
-Todas as saídas da sua IA geram um `message_draft` ou `auto_reply_draft`.
-
-*   **`POST /api/v1/ia/mensagens/enviar`**
-    *   **Objetivo:** Registrar a mensagem no banco de dados e enviá-la ao WhatsApp/Email do tutor (via webhook ou provedor).
+*Nota de Desenvolvimento: As rotas do "Módulo IA + Oracle" já possuem acesso à sessão do banco de dados (`db: Session = Depends(get_db)`) e contêm comentários `TODO` indicando exatamente onde as entidades do SQLAlchemy devem ser persistidas, de acordo com as regras de negócio do banco de dados final.*

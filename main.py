@@ -30,11 +30,13 @@ from presentation.routers.agendamentos_router import router as agendamentos_orac
 from presentation.routers.atendimentos_router import router as atendimentos_oracle_router
 from presentation.routers.triagens_router import router as triagens_oracle_router
 from presentation.routers.checkin_router import router as checkin_oracle_router
+from presentation.routers.orquestrador_router import router as orquestrador_router
 
 app.include_router(agendamentos_oracle_router)
 app.include_router(atendimentos_oracle_router)
 app.include_router(triagens_oracle_router)
 app.include_router(checkin_oracle_router)
+app.include_router(orquestrador_router)
 
 @app.get("/health")
 async def health_check():

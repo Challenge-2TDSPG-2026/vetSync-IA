@@ -2,7 +2,7 @@ import os
 import json
 from google import genai
 from google.genai import types
-from domain.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, CheckinResult
+from domain.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, CheckinResult, OrchestratorResult
 from infrastructure.prompts import SCHEDULE_SYSTEM_INSTRUCTION, TRIAGE_SYSTEM_INSTRUCTION, CHECKIN_SYSTEM_INSTRUCTION
 from application.ports import IAssistantGateway, AssistantGatewayError
 
@@ -130,3 +130,35 @@ class GeminiGateway(IAssistantGateway):
             
         except Exception as e:
             raise AssistantGatewayError(f"Erro ao processar intent de checkin no Gemini: {str(e)}")
+
+    def orchestrate_intent(self, prompt: str) -> OrchestratorResult:
+        try:
+            system_instruction = (
+                "Você é o orquestrador de intenções do sistema veterinário VetSync. "
+                "Classifique a mensagem do usuário em uma das seguintes categorias: "
+                "AGENDAMENTO (para marcar, cancelar, alterar consultas), "
+                "TRIAGEM (relato de sintomas ou problemas com o pet antes de ir à clínica), "
+                "POS_ATENDIMENTO (instruções do médico veterinário para o prontuário), "
+                "CHECKIN (relato do tutor sobre a recuperação pós-cirúrgica do pet), "
+                "ou OUTRO (se não se encaixar em nenhuma). "
+                "Retorne o resultado em JSON."
+            )
+            response = self.client.models.generate_content(
+                model=self.model_id,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    response_mime_type="application/json",
+                    response_schema=OrchestratorResult,
+                    temperature=0.0,
+                )
+            )
+            
+            if not response.text:
+                raise AssistantGatewayError("API returned empty text for orchestrator.")
+                
+            data = json.loads(response.text)
+            return OrchestratorResult(**data)
+            
+        except Exception as e:
+            raise AssistantGatewayError(f"Erro ao processar orquestração no Gemini: {str(e)}")
