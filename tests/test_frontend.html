@@ -185,6 +185,9 @@
         }
     }
 
+    // Variável global para guardar o histórico
+    let conversationHistory = [];
+
     async function sendRequest() {
         const promptInput = document.getElementById('prompt');
         const promptText = promptInput.value.trim();
@@ -192,23 +195,48 @@
 
         if (!promptText) return;
 
-        // Adiciona a mensagem do usuário na tela
+        // Adiciona a mensagem do usuário na tela e no histórico
         appendMessage('user', promptText);
+        conversationHistory.push({ role: 'user', text: promptText });
+        
         promptInput.value = '';
 
         // Trava botão e coloca balãozinho de "Digitando..."
         sendBtn.disabled = true;
         const loadingId = appendLoading();
 
+        // Warning de lentidão se demorar mais de 10s
+        let slowWarningId = 'slow-' + Date.now();
+        let timeoutWarning = setTimeout(() => {
+            const chatBox = document.getElementById('chatBox');
+            const msgDiv = document.createElement('div');
+            msgDiv.id = slowWarningId;
+            msgDiv.className = 'message bot';
+            msgDiv.style.fontStyle = 'italic';
+            msgDiv.style.color = '#777';
+            msgDiv.textContent = 'A rede está um pouco lenta (pico de tráfego), mas já estou consultando as informações para você... 🐾';
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }, 10000);
+
         try {
-            // Dispara pro nosso novo Orquestrador
+            // Dispara pro nosso novo Orquestrador passando o contexto (histórico)
             const response = await fetch(`http://localhost:8000/api/v1/ia/orquestrador/processar`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ message: promptText })
+                body: JSON.stringify({ 
+                    message: promptText,
+                    contexto: {
+                        history: conversationHistory.slice(-5) // Manda só as últimas 5 pra não pesar
+                    }
+                })
             });
+
+            clearTimeout(timeoutWarning);
+            let slowEl = document.getElementById(slowWarningId);
+            if (slowEl) slowEl.remove();
 
             const data = await response.json();
             
@@ -237,10 +265,21 @@
                 `;
 
                 appendMessage('bot', botHtml, true);
+                
+                // Adiciona a resposta da IA no histórico (pegando o texto limpo)
+                if (draft) {
+                    conversationHistory.push({ role: 'assistant', text: draft });
+                } else if (data.mensagem) {
+                    conversationHistory.push({ role: 'assistant', text: data.mensagem });
+                }
             } else {
                 appendMessage('bot', `ERRO (${response.status}):<br><pre>${JSON.stringify(data, null, 2)}</pre>`, true);
             }
         } catch (error) {
+            clearTimeout(timeoutWarning);
+            let slowEl = document.getElementById(slowWarningId);
+            if (slowEl) slowEl.remove();
+            
             removeLoading(loadingId);
             appendMessage('bot', `ERRO DE REDE: ${error.message}<br>A API (main.py) está rodando na porta 8000?`, true);
         } finally {
