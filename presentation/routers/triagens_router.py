@@ -44,14 +44,18 @@ def processar_triagem(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro na IA: {str(e)}")
 
-    # TODO: Logica de inserção no banco
-    # Exemplo: Inserir registro de triagem
-    # nova_triagem = TriagemOracle(risco=ia_result.urgency_level, tutor_id=usuario_logado["username"])
-    # db.add(nova_triagem)
+    from infrastructure.database.models import Triagem
+    import json
     
-    # if ia_result.notify_team:
-    #     # Notificar equipe de emergência
-    #     pass
+    nova_triagem = Triagem(
+        urgency_level=ia_result.urgency_level, 
+        tutor_id=usuario_logado["username"],
+        pet_id=request.pet_id,
+        symptoms=json.dumps(ia_result.identified_symptoms),
+        notify_team=ia_result.notify_team
+    )
+    db.add(nova_triagem)
+    db.commit()
 
     return {
         "usuario_logado": usuario_logado["username"],

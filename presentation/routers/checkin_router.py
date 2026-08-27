@@ -44,10 +44,18 @@ def processar_checkin(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro na IA: {str(e)}")
 
-    # TODO: Logica de inserção no banco
-    # Exemplo: Atualizar acompanhamento cirúrgico
-    # checkin_historico = CheckinOracle(status=ia_result.recovery_status, cirurgia_id=request.surgery_id)
-    # db.add(checkin_historico)
+    from infrastructure.database.models import Checkin
+    import json
+    
+    checkin_historico = Checkin(
+        tutor_id=usuario_logado["username"],
+        recovery_status=ia_result.recovery_status, 
+        surgery_id=request.surgery_id,
+        red_flags=json.dumps(ia_result.red_flags),
+        notify_veterinarian=ia_result.notify_veterinarian
+    )
+    db.add(checkin_historico)
+    db.commit()
 
     return {
         "usuario_logado": usuario_logado["username"],

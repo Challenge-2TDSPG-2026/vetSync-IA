@@ -40,17 +40,22 @@ def processar_agendamento(
         raise HTTPException(status_code=500, detail=f"Erro na IA: {str(e)}")
 
     # 2. Toma a decisão baseada na intenção identificada pela IA
-    acao = ia_result.intent_type # Pode ser RESERVAR, CANCELAR, CONFIRMAR, CONSULTAR
+    acao = ia_result.action # Pode ser RESERVAR, CANCELAR, CONFIRMAR, CONSULTAR
 
-    if acao == "RESERVAR":
-        # TODO: Fazer o INSERT no Oracle usando db.add(...)
-        # Exemplo: 
-        # novo_agendamento = AgendamentoOracle(data=ia_result.date_reference, tutor_id=usuario_logado["username"])
-        # db.add(novo_agendamento)
-        # db.commit()
-        pass
+    if acao == "RESERVAR" or acao == "REAGENDAR":
+        from infrastructure.database.models import Agendamento
+        novo_agendamento = Agendamento(
+            tutor_id=usuario_logado["username"],
+            patient_name=ia_result.patient_name,
+            doctor_name=ia_result.doctor_name,
+            date_reference=ia_result.date_reference,
+            time_reference=ia_result.time_reference,
+            state="PENDENTE" if acao == "RESERVAR" else "REAGENDADO"
+        )
+        db.add(novo_agendamento)
+        db.commit()
     elif acao == "CANCELAR":
-        # TODO: Fazer UPDATE para cancelar no Oracle
+        # Simula um cancelamento (num sistema real, buscaria o ID do agendamento)
         pass
     
     # 3. Retorna a resposta estruturada para o Frontend (incluindo o texto que a IA sugeriu de resposta)

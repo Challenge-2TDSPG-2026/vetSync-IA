@@ -24,6 +24,9 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
+# Importar modelos para que o SQLAlchemy saiba que eles existem antes de criar as tabelas
+from . import models
+
 # Em desenvolvimento, como o SQLite começa vazio, podemos pedir pro SQLAlchemy criar as tabelas
 if APP_ENV == "dev":
     Base.metadata.create_all(bind=engine)

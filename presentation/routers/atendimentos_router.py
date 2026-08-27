@@ -37,11 +37,16 @@ def processar_pos_atendimento(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro na IA: {str(e)}")
 
-    # TODO: Logica de inserção no banco
-    # Exemplo: Atualizar flag do prontuário ou agendar retorno para daqui a X dias
-    # if ia_result.days_until_follow_up:
-    #     novo_agendamento_retorno = AgendamentoOracle(...)
-    #     db.add(novo_agendamento_retorno)
+    from infrastructure.database.models import PosAtendimento
+    novo_pos_atendimento = PosAtendimento(
+        tutor_id=usuario_logado["username"],
+        pet_name=ia_result.pet_name,
+        days_until_follow_up=ia_result.days_until_follow_up,
+        attach_prescription=ia_result.attach_prescription,
+        attach_medical_record=ia_result.attach_medical_record
+    )
+    db.add(novo_pos_atendimento)
+    db.commit()
     
     return {
         "usuario_logado": usuario_logado["username"],
