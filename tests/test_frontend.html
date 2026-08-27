@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teste - IA Veterinária</title>
+    <title>Chat IA Veterinária (Orquestrador)</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #e5ddd5; /* Cor de fundo similar ao WhatsApp Web */
             margin: 0;
             padding: 20px;
             display: flex;
@@ -15,145 +15,275 @@
         }
         .container {
             background-color: #fff;
-            padding: 20px 30px;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             width: 100%;
-            max-width: 800px;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            height: 80vh; /* Ocupa 80% da tela */
         }
-        h1 {
-            color: #333;
+        .header {
+            background-color: #075e54; /* Verde escuro clássico */
+            color: white;
+            padding: 15px;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
             text-align: center;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
             font-weight: bold;
-            color: #555;
+        }
+        .chat-box {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); /* Pattern de fundo sutil */
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .message {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 15px;
+            line-height: 1.4;
+            position: relative;
+            word-wrap: break-word;
+        }
+        .message.user {
+            background-color: #dcf8c6; /* Verde claro mensagem enviada */
+            align-self: flex-end;
+            border-top-right-radius: 0;
+        }
+        .message.bot {
+            background-color: #fff;
+            align-self: flex-start;
+            border-top-left-radius: 0;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+        }
+        .input-area {
+            display: flex;
+            padding: 15px;
+            background-color: #f0f0f0;
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;
         }
         textarea {
-            width: 100%;
-            height: 100px;
-            padding: 10px;
+            flex: 1;
+            height: 40px;
+            padding: 10px 15px;
             border: 1px solid #ccc;
-            border-radius: 4px;
-            resize: vertical;
+            border-radius: 20px;
+            resize: none;
             font-family: inherit;
-        }
-        select, button {
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 16px;
+            outline: none;
+            font-size: 15px;
         }
         button {
-            background-color: #007bff;
+            background-color: #128c7e;
             color: white;
             border: none;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            margin-left: 10px;
             cursor: pointer;
-            width: 100%;
-            margin-top: 10px;
-            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0;
+            transition: 0.2s;
         }
         button:hover {
-            background-color: #0056b3;
+            background-color: #075e54;
         }
         button:disabled {
             background-color: #ccc;
             cursor: not-allowed;
         }
-        .response-container {
-            margin-top: 20px;
-            background-color: #272822;
-            color: #f8f8f2;
-            padding: 15px;
-            border-radius: 4px;
-            overflow-x: auto;
-        }
+        
+        /* Formatação de JSON no bot */
         pre {
-            margin: 0;
-            font-size: 14px;
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            overflow-x: auto;
+            margin-top: 10px;
+            border: 1px solid #ddd;
         }
-        .loading {
-            display: none;
-            text-align: center;
-            margin-top: 15px;
-            color: #007bff;
+        .category-badge {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            margin-bottom: 5px;
             font-weight: bold;
+        }
+        details {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #555;
+            cursor: pointer;
+        }
+
+        /* Animação dos pontinhos (Typing Indicator) */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 5px 0;
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            background-color: #999;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Teste Rápido - IA Veterinária</h1>
+    <div class="header">
+        Assistente VetSync (Orquestrador IA)
+    </div>
     
-    <div class="form-group">
-        <label for="endpoint">Qual funcionalidade testar?</label>
-        <select id="endpoint">
-            <option value="/api/v1/assistant/parse-scheduling">Agendamento Inteligente (Scheduling)</option>
-            <option value="/api/v1/assistant/parse-intent">Pós-Atendimento (Post-Care)</option>
-        </select>
+    <div class="chat-box" id="chatBox">
+        <div class="message bot">
+            Olá! Sou a assistente da VetSync. Como posso ajudar?<br>
+            <small><em>(Experimente mandar sintomas do seu pet, agendar consulta ou fazer check-in pós-cirúrgico)</em></small>
+        </div>
     </div>
 
-    <div class="form-group">
-        <label for="prompt">Mensagem / Comando (Linguagem Natural):</label>
-        <textarea id="prompt" placeholder="Ex: Quero marcar o retorno do Thor daqui a 7 dias, de preferência à tarde..."></textarea>
-    </div>
-
-    <button id="sendBtn" onclick="sendRequest()">Enviar para IA</button>
-    <div id="loading" class="loading">Processando com o Gemini...</div>
-
-    <div class="response-container">
-        <label>Resposta Estruturada (JSON):</label>
-        <pre id="jsonResponse">Aguardando requisição...</pre>
+    <div class="input-area">
+        <textarea id="prompt" placeholder="Digite sua mensagem..." onkeypress="handleEnter(event)"></textarea>
+        <button id="sendBtn" onclick="sendRequest()">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+            </svg>
+        </button>
     </div>
 </div>
 
 <script>
-    async function sendRequest() {
-        const endpoint = document.getElementById('endpoint').value;
-        const promptText = document.getElementById('prompt').value;
-        const jsonResponse = document.getElementById('jsonResponse');
-        const sendBtn = document.getElementById('sendBtn');
-        const loading = document.getElementById('loading');
-
-        if (!promptText.trim()) {
-            alert("Por favor, digite uma mensagem.");
-            return;
+    function handleEnter(e) {
+        // Envia com Enter (sem Shift)
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendRequest();
         }
+    }
 
-        // UI Feedback
+    async function sendRequest() {
+        const promptInput = document.getElementById('prompt');
+        const promptText = promptInput.value.trim();
+        const sendBtn = document.getElementById('sendBtn');
+
+        if (!promptText) return;
+
+        // Adiciona a mensagem do usuário na tela
+        appendMessage('user', promptText);
+        promptInput.value = '';
+
+        // Trava botão e coloca balãozinho de "Digitando..."
         sendBtn.disabled = true;
-        loading.style.display = "block";
-        jsonResponse.textContent = "Aguardando resposta...";
+        const loadingId = appendLoading();
 
         try {
-            const response = await fetch(`http://localhost:8000${endpoint}`, {
+            // Dispara pro nosso novo Orquestrador
+            const response = await fetch(`http://localhost:8000/api/v1/ia/orquestrador/processar`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ prompt: promptText })
+                body: JSON.stringify({ message: promptText })
             });
 
             const data = await response.json();
             
+            // Remove o balãozinho de "Digitando..."
+            removeLoading(loadingId);
+            
             if (response.ok) {
-                jsonResponse.textContent = JSON.stringify(data, null, 4);
+                // Monta o texto de resposta
+                let botHtml = `<span class="category-badge">${data.categoria_identificada}</span><br>`;
+                
+                // Tenta achar o rascunho de resposta que a IA gerou dependendo do caso de uso
+                const draft = data.dados_ia?.message_draft || data.dados_ia?.auto_reply_draft;
+                
+                if (draft) {
+                    botHtml += `<strong>SIA:</strong> ${draft}<br>`;
+                } else if (data.mensagem) {
+                    botHtml += `<strong>SIA:</strong> ${data.mensagem}<br>`;
+                }
+
+                // Coloca um menu retrátil com os dados estruturados reais pro desenvolvedor ver
+                botHtml += `
+                    <details>
+                        <summary>Ver Dados Extraídos para Banco (JSON)</summary>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </details>
+                `;
+
+                appendMessage('bot', botHtml, true);
             } else {
-                jsonResponse.textContent = `ERRO (${response.status}):\n${JSON.stringify(data, null, 4)}`;
+                appendMessage('bot', `ERRO (${response.status}):<br><pre>${JSON.stringify(data, null, 2)}</pre>`, true);
             }
         } catch (error) {
-            jsonResponse.textContent = `ERRO DE REDE: ${error.message}\nCertifique-se de que a API (main.py) está rodando.`;
+            removeLoading(loadingId);
+            appendMessage('bot', `ERRO DE REDE: ${error.message}<br>A API (main.py) está rodando na porta 8000?`, true);
         } finally {
-            // Restore UI
             sendBtn.disabled = false;
-            loading.style.display = "none";
         }
+    }
+
+    function appendMessage(sender, text, isHtml=false) {
+        const chatBox = document.getElementById('chatBox');
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${sender}`;
+        
+        if (isHtml) {
+            msgDiv.innerHTML = text;
+        } else {
+            msgDiv.textContent = text;
+        }
+        
+        chatBox.appendChild(msgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function appendLoading() {
+        const chatBox = document.getElementById('chatBox');
+        const msgDiv = document.createElement('div');
+        const id = 'loading-' + Date.now();
+        msgDiv.id = id;
+        msgDiv.className = `message bot`;
+        msgDiv.innerHTML = `
+            <div class="typing-indicator">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+        `;
+        chatBox.appendChild(msgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        return id;
+    }
+
+    function removeLoading(id) {
+        const el = document.getElementById(id);
+        if (el) el.remove();
     }
 </script>
 
