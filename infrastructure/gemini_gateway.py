@@ -60,11 +60,25 @@ class GeminiGateway(IAssistantGateway):
             full_prompt += f"Contexto opcional do tutor/pets: {json.dumps(context)}\n\n" if context else ""
             full_prompt += f"Mensagem atual do tutor: {prompt}"
 
+            def consultar_disponibilidade(data_referencia: str) -> list[str]:
+                """Consulta a disponibilidade de horários na agenda da clínica para uma determinada data. Ex: 'hoje', 'amanha', '2025-10-10'."""
+                # Aqui simularíamos uma busca SQL no banco Oracle ou SQLite
+                # SELECT horario FROM agenda WHERE data = data_referencia AND status = 'LIVRE'
+                data_lower = data_referencia.lower()
+                if "hoje" in data_lower:
+                    return ["14:00", "15:30"]
+                elif "amanh" in data_lower:
+                    return ["09:00", "11:00"]
+                else:
+                    return ["10:00", "13:00", "16:00"] # Mock genérico para outras datas
+
+            # Usamos o recurso nativo de Automatic Function Calling (AFC) da SDK do Gemini
             response = self.client.models.generate_content(
                 model=self.model_id,
                 contents=full_prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=SCHEDULE_SYSTEM_INSTRUCTION,
+                    tools=[consultar_disponibilidade],
                     response_mime_type="application/json",
                     response_schema=SchedulingIntent,
                     temperature=0.2,
