@@ -3,7 +3,7 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 # Pegamos a MESMA chave secreta que o Spring Security do Java usa
 # Deve estar no seu arquivo .env
@@ -12,8 +12,17 @@ ALGORITHM = "HS256" # Geralmente o Spring usa HS256 por padrão
 
 def verificar_token_externo(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
-    Decodifica e valida o token JWT gerado pelo Java Spring Security.
+    Decodifica e valida o token JWT gerado pelo Java Spring Security (se em prod).
+    Se em ambiente de desenvolvimento (dev), pula a autenticação.
     """
+    ambiente = os.getenv("APP_ENV", "dev")
+    
+    if ambiente == "dev":
+        return {"token": "mock_token_dev", "username": "usuario_dev", "payload_completo": {"roles": ["ADMIN"]}}
+
+    if not credentials:
+        raise HTTPException(status_code=403, detail="Não autenticado. Token não fornecido.")
+
     token = credentials.credentials
     
     try:
