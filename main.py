@@ -25,6 +25,10 @@ app.include_router(router)
 app.include_router(triage_router)
 app.include_router(checkin_router)
 
+# Importando e incluindo as novas rotas que conectam IA + Banco Oracle
+from presentation.routers.agendamentos_router import router as agendamentos_oracle_router
+app.include_router(agendamentos_oracle_router)
+
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
