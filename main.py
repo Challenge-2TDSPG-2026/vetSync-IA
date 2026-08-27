@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from presentation.routers import router, triage_router, checkin_router
+from presentation.assistant_routers import router, triage_router, checkin_router
 from dotenv import load_dotenv
 
 # Carrega variáveis de ambiente
