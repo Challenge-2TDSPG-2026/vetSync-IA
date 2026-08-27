@@ -11,7 +11,7 @@ class IAssistantGateway(ABC):
         pass
 
     @abstractmethod
-    def parse_scheduling_intent(self, prompt: str) -> SchedulingIntent:
+    def parse_scheduling_intent(self, prompt: str, context: dict = None) -> SchedulingIntent:
         pass
         
     @abstractmethod

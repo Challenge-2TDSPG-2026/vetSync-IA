@@ -49,11 +49,20 @@ class GeminiGateway(IAssistantGateway):
         except Exception as e:
             raise AssistantGatewayError(f"Erro ao processar intent no Gemini: {str(e)}")
 
-    def parse_scheduling_intent(self, prompt: str) -> SchedulingIntent:
+    def parse_scheduling_intent(self, prompt: str, context: dict = None) -> SchedulingIntent:
         try:
+            full_prompt = ""
+            if context and "history" in context:
+                history = context.pop("history")
+                history_text = "\n".join([f"{msg['role'].capitalize()}: {msg['text']}" for msg in history])
+                full_prompt += f"Histórico de mensagens:\n{history_text}\n\n"
+                
+            full_prompt += f"Contexto opcional do tutor/pets: {json.dumps(context)}\n\n" if context else ""
+            full_prompt += f"Mensagem atual do tutor: {prompt}"
+
             response = self.client.models.generate_content(
                 model=self.model_id,
-                contents=prompt,
+                contents=full_prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=SCHEDULE_SYSTEM_INSTRUCTION,
                     response_mime_type="application/json",

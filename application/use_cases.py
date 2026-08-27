@@ -26,12 +26,12 @@ class ProcessSchedulingIntentUseCase:
     def __init__(self, gateway: IAssistantGateway):
         self.gateway = gateway
         
-    def execute(self, prompt: str) -> SchedulingIntent:
+    def execute(self, prompt: str, context: dict = None) -> SchedulingIntent:
         if not prompt or not prompt.strip():
             raise ProcessSchedulingIntentUseCaseError("O prompt não pode estar vazio.")
             
         try:
-            return self.gateway.parse_scheduling_intent(prompt)
+            return self.gateway.parse_scheduling_intent(prompt, context)
         except AssistantGatewayError as e:
             raise ProcessSchedulingIntentUseCaseError(f"Falha na integração: {str(e)}")
         except Exception as e:

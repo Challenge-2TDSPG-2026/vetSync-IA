@@ -45,21 +45,26 @@ def processar_chat_universal(
     Lê a mensagem, usa a IA para classificar a intenção e então redireciona para o UseCase correto.
     """
     try:
-        # 1. Orquestração: Descobrir o que o usuário quer
+        # 1. Enriquecer o contexto com os dados do banco (Simulado aqui, mas em prod viria do Oracle)
+        contexto_enriquecido = request.contexto or {}
+        contexto_enriquecido["tutor_id"] = usuario_logado["username"]
+        contexto_enriquecido["pets_do_tutor"] = ["Thor (Cachorro)", "Nina (Gato)"] # Simulação de busca no banco
+
+        # 2. Orquestração: Descobrir o que o usuário quer
         orquestracao = use_case.execute(request.message)
         categoria = orquestracao.intent_category
         
         resultado_final = None
         
-        # 2. Roteamento interno
+        # 3. Roteamento interno
         if categoria == "AGENDAMENTO":
             uc = ProcessSchedulingIntentUseCase(gateway)
-            resultado_final = uc.execute(request.message)
+            resultado_final = uc.execute(request.message, contexto_enriquecido)
             # TODO: Lógica de banco de dados para agendamento
             
         elif categoria == "TRIAGEM":
             uc = ProcessTriageIntentUseCase(gateway)
-            resultado_final = uc.execute(request.message, request.contexto)
+            resultado_final = uc.execute(request.message, contexto_enriquecido)
             # TODO: Lógica de banco de dados para triagem
             
         elif categoria == "POS_ATENDIMENTO":
@@ -69,7 +74,7 @@ def processar_chat_universal(
             
         elif categoria == "CHECKIN":
             uc = ProcessCheckinIntentUseCase(gateway)
-            resultado_final = uc.execute(request.message, request.contexto)
+            resultado_final = uc.execute(request.message, contexto_enriquecido)
             # TODO: Lógica de banco de dados para checkin
             
         else:
