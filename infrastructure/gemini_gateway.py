@@ -13,7 +13,7 @@ class GeminiGateway(IAssistantGateway):
             raise AssistantGatewayError("GEMINI_API_KEY environment variable is missing.")
         
         self.client = genai.Client(api_key=api_key)
-        self.model_id = 'gemini-3.6-flash'
+        self.model_id = 'gemini-3.5-flash-lite' # Modelo mais rápido para evitar gargalo 503
         
         self.system_instruction = (
             "Seu nome é SIA (Sync Inteligência Artificial), a assistente virtual do sistema VetSync. "
@@ -58,37 +58,66 @@ class GeminiGateway(IAssistantGateway):
                 full_prompt += f"Histórico de mensagens:\n{history_text}\n\n"
                 
             full_prompt += f"Contexto opcional do tutor/pets: {json.dumps(context)}\n\n" if context else ""
-            full_prompt += f"Mensagem atual do tutor: {prompt}"
 
             def consultar_disponibilidade(data_referencia: str) -> list[str]:
                 """Consulta a disponibilidade de horários na agenda da clínica para uma determinada data. Ex: 'hoje', 'amanha', '2025-10-10'."""
-                # Aqui simularíamos uma busca SQL no banco Oracle ou SQLite
-                # SELECT horario FROM agenda WHERE data = data_referencia AND status = 'LIVRE'
+                print(f"-> [Function Calling] IA consultou a data: {data_referencia}")
                 data_lower = data_referencia.lower()
                 if "hoje" in data_lower:
-                    return ["14:00", "15:30"]
+                    return ["14:00", "15:30", "17:00"]
                 elif "amanh" in data_lower:
                     return ["09:00", "11:00"]
                 else:
-                    return ["10:00", "13:00", "16:00"] # Mock genérico para outras datas
+                    return ["10:00", "13:00", "16:00"]
 
-            # Usamos o recurso nativo de Automatic Function Calling (AFC) da SDK do Gemini
-            response = self.client.models.generate_content(
+            # Função auxiliar para retentativas em caso de 503
+            import time
+            def call_with_retry(func, *args, **kwargs):
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        return func(*args, **kwargs)
+                    except Exception as e:
+                        if "503" in str(e) and attempt < max_retries - 1:
+                            time.sleep(2)
+                        else:
+                            raise e
+
+            # Passo 1: Chat com Function Calling para gerar a resposta textual
+            chat = self.client.chats.create(
                 model=self.model_id,
-                contents=full_prompt,
                 config=types.GenerateContentConfig(
-                    system_instruction=SCHEDULE_SYSTEM_INSTRUCTION,
+                    system_instruction="Você é a assistente virtual VetSync. Use a ferramenta 'consultar_disponibilidade' para verificar horários sempre que o tutor perguntar por disponibilidade. Responda em tom amigável.",
                     tools=[consultar_disponibilidade],
-                    response_mime_type="application/json",
-                    response_schema=SchedulingIntent,
                     temperature=0.2,
                 )
             )
+            chat_response = call_with_retry(chat.send_message, full_prompt + f"Mensagem atual do tutor: {prompt}")
+            texto_final_ia = chat_response.text
+
+            # Passo 2: Extrair os dados para o Schema JSON exigido pelo banco de dados
+            extracao_prompt = f"Baseado nesta conversa final:\n{full_prompt}\nUsuário: {prompt}\nIA: {texto_final_ia}\n\nExtraia os dados estruturados do agendamento."
             
-            if not response.text:
-                raise AssistantGatewayError("API returned empty text for scheduling.")
+            extracao_response = call_with_retry(
+                self.client.models.generate_content,
+                model=self.model_id,
+                contents=extracao_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=SCHEDULE_SYSTEM_INSTRUCTION,
+                    response_mime_type="application/json",
+                    response_schema=SchedulingIntent,
+                    temperature=0.0,
+                )
+            )
+            
+            if not extracao_response.text:
+                raise AssistantGatewayError("API returned empty text for scheduling extraction.")
                 
-            data = json.loads(response.text)
+            data = json.loads(extracao_response.text)
+            
+            # Forçar o rascunho a ser a resposta inteligente que o Function Calling gerou
+            data["message_draft"] = texto_final_ia
+            
             return SchedulingIntent(**data)
             
         except Exception as e:
