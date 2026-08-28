@@ -60,3 +60,14 @@ class CheckinResult(BaseModel):
 class OrchestratorResult(BaseModel):
     intent_category: str = Field(description="A categoria da intenção: AGENDAMENTO, TRIAGEM, POS_ATENDIMENTO, CHECKIN, ou OUTRO")
     reasoning: str = Field(description="O motivo da classificação")
+
+class DoctorCommandIntent(BaseModel):
+    action: str = Field(description="Ação do médico: CONSULTAR_HISTORICO ou ENVIAR_MENSAGEM")
+    tutor_name: Optional[str] = Field(description="Nome do tutor, se mencionado")
+    pet_name: Optional[str] = Field(description="Nome do pet, se mencionado")
+    message_draft: Optional[str] = Field(description="Texto da mensagem que será enviada para o tutor, se aplicável")
+    history_summary: Optional[str] = Field(description="Resumo do histórico do paciente recuperado pelo banco de dados")
+    
+class ChatMessage(BaseModel):
+    remetente: str
+    texto: str
