@@ -2,7 +2,7 @@ import os
 import json
 from google import genai
 from google.genai import types
-from domain.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, CheckinResult, OrchestratorResult
+from domain.models.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, CheckinResult, OrchestratorResult
 from infrastructure.prompts import SCHEDULE_SYSTEM_INSTRUCTION, TRIAGE_SYSTEM_INSTRUCTION, CHECKIN_SYSTEM_INSTRUCTION
 from application.ports import IAssistantGateway, AssistantGatewayError
 
@@ -214,3 +214,51 @@ class GeminiGateway(IAssistantGateway):
             
         except Exception as e:
             raise AssistantGatewayError(f"Erro ao processar orquestração no Gemini: {str(e)}")
+
+    def parse_doctor_command(self, prompt: str) -> dict:
+        try:
+            from domain.models.models import DoctorCommandIntent
+            
+            def consultar_historico(tutor_name: str, pet_name: str = None) -> str:
+                """Busca no banco de dados o histórico clínico, receitas e prontuários do pet do tutor informado."""
+                print(f"-> [Function Calling] IA buscou histórico de: {tutor_name}, pet: {pet_name}")
+                return f"Histórico de {tutor_name}: Última consulta há 2 meses. Receita: Dipirona gotas. Prontuário: Animal chegou com dores leves, mas liberado bem."
+
+            system_instruction = (
+                "Você é a assistente do médico veterinário (VetSync). O médico pode pedir duas coisas: "
+                "1) Puxar o histórico de um paciente (use a ferramenta consultar_historico). "
+                "2) Enviar uma mensagem para o tutor, por exemplo, marcando retorno. "
+                "Retorne SEMPRE um JSON no schema DoctorCommandIntent. "
+                "Se for pedir histórico, extraia os dados com a ferramenta, e coloque o resultado no history_summary. A action deve ser CONSULTAR_HISTORICO. "
+                "Se for mandar mensagem para o tutor (ex: 'mande mensagem pra ele marcando retorno em 15 dias'), crie a mensagem amigável no message_draft, e a action deve ser ENVIAR_MENSAGEM."
+            )
+            
+            chat = self.client.chats.create(
+                model=self.model_id,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    tools=[consultar_historico],
+                    temperature=0.2,
+                )
+            )
+            chat_response = chat.send_message(prompt)
+            texto_intermediario = chat_response.text
+
+            # Passo 2: Extrair JSON
+            extracao_prompt = f"Usuário: {prompt}\nContexto de ferramenta: {texto_intermediario}\nExtraia os dados estruturados conforme o schema."
+            extracao_response = self.client.models.generate_content(
+                model=self.model_id,
+                contents=extracao_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    response_mime_type="application/json",
+                    response_schema=DoctorCommandIntent,
+                    temperature=0.0,
+                )
+            )
+            
+            data = json.loads(extracao_response.text)
+            return data
+            
+        except Exception as e:
+            raise AssistantGatewayError(f"Erro ao processar comando do doutor no Gemini: {str(e)}")

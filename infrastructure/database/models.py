@@ -43,3 +43,12 @@ class Checkin(Base):
     red_flags = Column(String(1000), nullable=True)
     notify_veterinarian = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class MensagemChat(Base):
+    __tablename__ = "mensagens_chat"
+    id = Column(Integer, primary_key=True, index=True)
+    tutor_id = Column(String(100), index=True)
+    remetente = Column(String(50)) # 'IA', 'TUTOR', 'SISTEMA', 'DOUTOR'
+    texto = Column(String(1000))
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
