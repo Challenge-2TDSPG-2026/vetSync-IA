@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from application.use_cases import ProcessPostCareIntentUseCase, ProcessPostCareIntentUseCaseError, ProcessSchedulingIntentUseCase, ProcessSchedulingIntentUseCaseError, ProcessTriageIntentUseCase, ProcessTriageIntentUseCaseError, ProcessCheckinIntentUseCase, ProcessCheckinIntentUseCaseError
-from domain.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, TriageInboundRequest, CheckinResult, CheckinResponseRequest
+from domain.models.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, TriageInboundRequest, CheckinResult, CheckinResponseRequest
 from application.ports import IAssistantGateway
 from infrastructure.gemini_gateway import GeminiGateway
 

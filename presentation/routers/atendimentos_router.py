@@ -7,7 +7,7 @@ from infrastructure.auth.security import verificar_token_externo
 from application.ports import IAssistantGateway
 from infrastructure.gemini_gateway import GeminiGateway
 from application.use_cases import ProcessPostCareIntentUseCase
-from domain.models import ClinicalPostCarePlan
+from domain.models.models import ClinicalPostCarePlan
 
 router = APIRouter(
     prefix="/api/v1/ia/atendimentos",

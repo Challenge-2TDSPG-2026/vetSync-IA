@@ -8,7 +8,7 @@ from infrastructure.auth.security import verificar_token_externo
 from application.ports import IAssistantGateway
 from infrastructure.gemini_gateway import GeminiGateway
 from application.use_cases import ProcessTriageIntentUseCase
-from domain.models import TriageResult
+from domain.models.models import TriageResult
 
 router = APIRouter(
     prefix="/api/v1/ia/triagens",

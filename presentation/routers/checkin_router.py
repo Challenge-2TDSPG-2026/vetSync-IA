@@ -8,7 +8,7 @@ from infrastructure.auth.security import verificar_token_externo
 from application.ports import IAssistantGateway
 from infrastructure.gemini_gateway import GeminiGateway
 from application.use_cases import ProcessCheckinIntentUseCase
-from domain.models import CheckinResult
+from domain.models.models import CheckinResult
 
 router = APIRouter(
     prefix="/api/v1/ia/checkins",
