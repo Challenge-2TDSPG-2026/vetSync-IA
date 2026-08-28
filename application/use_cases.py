@@ -1,4 +1,4 @@
-from domain.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, CheckinResult, OrchestratorResult
+from domain.models.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, CheckinResult, OrchestratorResult
 from application.ports import IAssistantGateway, AssistantGatewayError
 
 class ProcessPostCareIntentUseCaseError(Exception):

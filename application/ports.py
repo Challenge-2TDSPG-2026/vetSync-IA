@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from domain.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, CheckinResult, OrchestratorResult
+from domain.models.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, CheckinResult, OrchestratorResult
 
 class AssistantGatewayError(Exception):
     """Exceção base para erros de integração com a IA."""
