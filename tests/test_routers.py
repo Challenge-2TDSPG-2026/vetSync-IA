@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 from main import app
 from application.ports import IAssistantGateway, AssistantGatewayError
 from presentation.routers import get_gateway
-from domain.models import ClinicalPostCarePlan, SchedulingIntent
+from domain.models.models import ClinicalPostCarePlan, SchedulingIntent
 
 class MockAssistantGateway(IAssistantGateway):
     def __init__(self, fail=False):
@@ -35,7 +35,7 @@ class MockAssistantGateway(IAssistantGateway):
         )
 
     def parse_triage_intent(self, prompt: str, context: dict = None):
-        from domain.models import TriageResult
+        from domain.models.models import TriageResult
         if self.fail:
             raise AssistantGatewayError("Erro simulado")
         return TriageResult(
@@ -47,7 +47,7 @@ class MockAssistantGateway(IAssistantGateway):
         )
 
     def parse_checkin_intent(self, prompt: str, context: dict = None):
-        from domain.models import CheckinResult
+        from domain.models.models import CheckinResult
         if self.fail:
             raise AssistantGatewayError("Erro simulado")
         return CheckinResult(

@@ -1,7 +1,7 @@
 import pytest
 from application.use_cases import ProcessPostCareIntentUseCase, ProcessSchedulingIntentUseCase, ProcessPostCareIntentUseCaseError, ProcessSchedulingIntentUseCaseError
 from application.ports import IAssistantGateway, AssistantGatewayError
-from domain.models import ClinicalPostCarePlan, SchedulingIntent
+from domain.models.models import ClinicalPostCarePlan, SchedulingIntent
 
 class MockAssistantGateway(IAssistantGateway):
     def __init__(self):
@@ -34,7 +34,7 @@ class MockAssistantGateway(IAssistantGateway):
         )
 
     def parse_triage_intent(self, prompt: str, context: dict = None):
-        from domain.models import TriageResult
+        from domain.models.models import TriageResult
         if self.should_fail:
             raise AssistantGatewayError("Mocked failure")
         return TriageResult(
@@ -46,7 +46,7 @@ class MockAssistantGateway(IAssistantGateway):
         )
 
     def parse_checkin_intent(self, prompt: str, context: dict = None):
-        from domain.models import CheckinResult
+        from domain.models.models import CheckinResult
         if self.should_fail:
             raise AssistantGatewayError("Mocked failure")
         return CheckinResult(

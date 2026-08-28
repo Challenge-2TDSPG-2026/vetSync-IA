@@ -3,327 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat IA Veterinária (Orquestrador)</title>
+    <title>VetSync - In-App Chat Demo</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #e5ddd5; /* Cor de fundo similar ao WhatsApp Web */
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-        }
-        .container {
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 600px;
-            display: flex;
-            flex-direction: column;
-            height: 80vh; /* Ocupa 80% da tela */
-        }
-        .header {
-            background-color: #075e54; /* Verde escuro clássico */
-            color: white;
-            padding: 15px;
-            border-top-left-radius: 8px;
-            border-top-right-radius: 8px;
-            text-align: center;
-            font-weight: bold;
-        }
-        .chat-box {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-            background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png'); /* Pattern de fundo sutil */
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .message {
-            max-width: 80%;
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 15px;
-            line-height: 1.4;
-            position: relative;
-            word-wrap: break-word;
-        }
-        .message.user {
-            background-color: #dcf8c6; /* Verde claro mensagem enviada */
-            align-self: flex-end;
-            border-top-right-radius: 0;
-        }
-        .message.bot {
-            background-color: #fff;
-            align-self: flex-start;
-            border-top-left-radius: 0;
-            box-shadow: 0 1px 1px rgba(0,0,0,0.1);
-        }
-        .input-area {
-            display: flex;
-            padding: 15px;
-            background-color: #f0f0f0;
-            border-bottom-left-radius: 8px;
-            border-bottom-right-radius: 8px;
-        }
-        textarea {
-            flex: 1;
-            height: 40px;
-            padding: 10px 15px;
-            border: 1px solid #ccc;
-            border-radius: 20px;
-            resize: none;
-            font-family: inherit;
-            outline: none;
-            font-size: 15px;
-        }
-        button {
-            background-color: #128c7e;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 45px;
-            height: 45px;
-            margin-left: 10px;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-shrink: 0;
-            transition: 0.2s;
-        }
-        button:hover {
-            background-color: #075e54;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        
-        /* Formatação de JSON no bot */
-        pre {
-            background: #f4f4f4;
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 12px;
-            overflow-x: auto;
-            margin-top: 10px;
-            border: 1px solid #ddd;
-        }
-        .category-badge {
-            display: inline-block;
-            background: #007bff;
-            color: white;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        details {
-            margin-top: 10px;
-            font-size: 13px;
-            color: #555;
-            cursor: pointer;
-        }
-
-        /* Animação dos pontinhos (Typing Indicator) */
-        .typing-indicator {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 5px 0;
-        }
-        .dot {
-            width: 8px;
-            height: 8px;
-            background-color: #999;
-            border-radius: 50%;
-            animation: bounce 1.4s infinite ease-in-out both;
-        }
-        .dot:nth-child(1) { animation-delay: -0.32s; }
-        .dot:nth-child(2) { animation-delay: -0.16s; }
-        
-        @keyframes bounce {
-            0%, 80%, 100% { transform: scale(0); }
-            40% { transform: scale(1); }
-        }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #f0f2f5; margin: 0; display: flex; height: 100vh; }
+        .panel { flex: 1; display: flex; flex-direction: column; padding: 20px; border-right: 2px solid #ccc; }
+        .panel h2 { text-align: center; color: #333; }
+        .chat-box { flex: 1; background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .input-area { display: flex; gap: 10px; margin-top: 15px; }
+        textarea { flex: 1; height: 50px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; resize: none; font-family: inherit; }
+        button { background: #075e54; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #128c7e; }
+        .msg { max-width: 80%; padding: 10px; border-radius: 8px; font-size: 14px; line-height: 1.4; }
+        .msg.doctor { background: #dcf8c6; align-self: flex-end; }
+        .msg.system { background: #eee; align-self: flex-start; border-left: 4px solid #075e54; font-size: 13px; }
+        .msg.tutor { background: #dcf8c6; align-self: flex-end; }
+        .msg.ia { background: #fff; align-self: flex-start; border: 1px solid #ddd; }
+        .refresh-btn { background: #444; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="header">
-        Assistente VetSync (Orquestrador IA)
+<!-- PAINEL DO MÉDICO -->
+<div class="panel">
+    <h2>Visão do Médico</h2>
+    <div class="chat-box" id="docChat">
+        <div class="msg system"><strong>Sistema:</strong> Digite um comando. Ex: "Puxe o histórico do Rodrigo" ou "Mande uma mensagem marcando retorno em 15 dias"</div>
     </div>
-    
-    <div class="chat-box" id="chatBox">
-        <div class="message bot">
-            Olá! Sou a assistente da VetSync. Como posso ajudar?<br>
-            <small><em>(Experimente mandar sintomas do seu pet, agendar consulta ou fazer check-in pós-cirúrgico)</em></small>
-        </div>
-    </div>
-
     <div class="input-area">
-        <textarea id="prompt" placeholder="Digite sua mensagem..." onkeypress="handleEnter(event)"></textarea>
-        <button id="sendBtn" onclick="sendRequest()">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
-            </svg>
-        </button>
+        <textarea id="docInput" placeholder="Ex: Mande mensagem para ele marcando retorno em 15 dias"></textarea>
+        <button onclick="sendDoctorCommand()">Enviar Comando</button>
+    </div>
+</div>
+
+<!-- PAINEL DO TUTOR -->
+<div class="panel">
+    <h2>App do Tutor (In-App Chat)</h2>
+    <button class="refresh-btn" onclick="loadTutorChat()">🔄 Recarregar Mensagens</button>
+    <div class="chat-box" id="tutorChat">
+    </div>
+    <div class="input-area">
+        <textarea id="tutorInput" placeholder="Responda à clínica... (Ex: Não posso nesse dia)"></textarea>
+        <button onclick="sendTutorMessage()">Responder</button>
     </div>
 </div>
 
 <script>
-    function handleEnter(e) {
-        // Envia com Enter (sem Shift)
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendRequest();
-        }
-    }
+    const TUTOR_ID = "rodrigo_123";
 
-    // Variável global para guardar o histórico
-    let conversationHistory = [];
-
-    async function sendRequest() {
-        const promptInput = document.getElementById('prompt');
-        const promptText = promptInput.value.trim();
-        const sendBtn = document.getElementById('sendBtn');
-
-        if (!promptText) return;
-
-        // Adiciona a mensagem do usuário na tela e no histórico
-        appendMessage('user', promptText);
-        conversationHistory.push({ role: 'user', text: promptText });
+    async function sendDoctorCommand() {
+        const input = document.getElementById('docInput');
+        const text = input.value.trim();
+        if(!text) return;
         
-        promptInput.value = '';
-
-        // Trava botão e coloca balãozinho de "Digitando..."
-        sendBtn.disabled = true;
-        const loadingId = appendLoading();
-
-        // Warning de lentidão se demorar mais de 10s
-        let slowWarningId = 'slow-' + Date.now();
-        let timeoutWarning = setTimeout(() => {
-            const chatBox = document.getElementById('chatBox');
-            const msgDiv = document.createElement('div');
-            msgDiv.id = slowWarningId;
-            msgDiv.className = 'message bot';
-            msgDiv.style.fontStyle = 'italic';
-            msgDiv.style.color = '#777';
-            msgDiv.textContent = 'A rede está um pouco lenta (pico de tráfego), mas já estou consultando as informações para você... 🐾';
-            chatBox.appendChild(msgDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }, 10000);
+        appendMsg('docChat', text, 'doctor');
+        input.value = '';
 
         try {
-            // Dispara pro nosso novo Orquestrador passando o contexto (histórico)
-            const response = await fetch(`http://localhost:8000/api/v1/ia/orquestrador/processar`, {
+            const res = await fetch('http://localhost:8000/api/v1/in-app/doctor/comando', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ 
-                    message: promptText,
-                    contexto: {
-                        history: conversationHistory.slice(-5) // Manda só as últimas 5 pra não pesar
-                    }
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ comando: text, tutor_id: TUTOR_ID })
             });
-
-            clearTimeout(timeoutWarning);
-            let slowEl = document.getElementById(slowWarningId);
-            if (slowEl) slowEl.remove();
-
-            const data = await response.json();
+            const data = await res.json();
             
-            // Remove o balãozinho de "Digitando..."
-            removeLoading(loadingId);
+            let systemReply = `Ação: ${data.ia_response.action}<br>`;
+            if (data.ia_response.history_summary) systemReply += `<strong>Histórico:</strong> ${data.ia_response.history_summary}<br>`;
+            if (data.ia_response.message_draft) systemReply += `<strong>Mensagem disparada p/ tutor:</strong> ${data.ia_response.message_draft}`;
             
-            if (response.ok) {
-                // Monta o texto de resposta
-                let botHtml = `<span class="category-badge">${data.categoria_identificada}</span><br>`;
-                
-                // Tenta achar o rascunho de resposta que a IA gerou dependendo do caso de uso
-                const draft = data.dados_ia?.message_draft || data.dados_ia?.auto_reply_draft;
-                
-                if (draft) {
-                    botHtml += `<strong>SIA:</strong> ${draft}<br>`;
-                } else if (data.mensagem) {
-                    botHtml += `<strong>SIA:</strong> ${data.mensagem}<br>`;
-                }
-
-                // Coloca um menu retrátil com os dados estruturados reais pro desenvolvedor ver
-                botHtml += `
-                    <details>
-                        <summary>Ver Dados Extraídos para Banco (JSON)</summary>
-                        <pre>${JSON.stringify(data, null, 2)}</pre>
-                    </details>
-                `;
-
-                appendMessage('bot', botHtml, true);
-                
-                // Adiciona a resposta da IA no histórico (pegando o texto limpo)
-                if (draft) {
-                    conversationHistory.push({ role: 'assistant', text: draft });
-                } else if (data.mensagem) {
-                    conversationHistory.push({ role: 'assistant', text: data.mensagem });
-                }
-            } else {
-                appendMessage('bot', `ERRO (${response.status}):<br><pre>${JSON.stringify(data, null, 2)}</pre>`, true);
-            }
-        } catch (error) {
-            clearTimeout(timeoutWarning);
-            let slowEl = document.getElementById(slowWarningId);
-            if (slowEl) slowEl.remove();
+            appendMsg('docChat', systemReply, 'system');
             
-            removeLoading(loadingId);
-            appendMessage('bot', `ERRO DE REDE: ${error.message}<br>A API (main.py) está rodando na porta 8000?`, true);
-        } finally {
-            sendBtn.disabled = false;
+            // Recarrega o app do tutor pra simular notificação push
+            setTimeout(loadTutorChat, 1000);
+        } catch(e) {
+            appendMsg('docChat', 'Erro: ' + e.message, 'system');
         }
     }
 
-    function appendMessage(sender, text, isHtml=false) {
-        const chatBox = document.getElementById('chatBox');
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `message ${sender}`;
-        
-        if (isHtml) {
-            msgDiv.innerHTML = text;
-        } else {
-            msgDiv.textContent = text;
+    async function sendTutorMessage() {
+        const input = document.getElementById('tutorInput');
+        const text = input.value.trim();
+        if(!text) return;
+
+        appendMsg('tutorChat', text, 'tutor');
+        input.value = '';
+
+        try {
+            const res = await fetch('http://localhost:8000/api/v1/in-app/chat/tutor', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mensagem: text, tutor_id: TUTOR_ID })
+            });
+            setTimeout(loadTutorChat, 500); // Reload chat
+        } catch(e) {
+            appendMsg('tutorChat', 'Erro de conexão.', 'ia');
         }
-        
-        chatBox.appendChild(msgDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    function appendLoading() {
-        const chatBox = document.getElementById('chatBox');
-        const msgDiv = document.createElement('div');
-        const id = 'loading-' + Date.now();
-        msgDiv.id = id;
-        msgDiv.className = `message bot`;
-        msgDiv.innerHTML = `
-            <div class="typing-indicator">
-                <div class="dot"></div>
-                <div class="dot"></div>
-                <div class="dot"></div>
-            </div>
-        `;
-        chatBox.appendChild(msgDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
-        return id;
+    async function loadTutorChat() {
+        try {
+            const res = await fetch(`http://localhost:8000/api/v1/in-app/chat/${TUTOR_ID}`);
+            const data = await res.json();
+            const chatBox = document.getElementById('tutorChat');
+            chatBox.innerHTML = '';
+            data.mensagens.forEach(msg => {
+                const cls = msg.remetente === 'TUTOR' ? 'tutor' : 'ia';
+                appendMsg('tutorChat', msg.texto, cls);
+            });
+        } catch(e) {
+            console.error(e);
+        }
     }
 
-    function removeLoading(id) {
-        const el = document.getElementById(id);
-        if (el) el.remove();
+    function appendMsg(boxId, html, className) {
+        const box = document.getElementById(boxId);
+        const div = document.createElement('div');
+        div.className = `msg ${className}`;
+        div.innerHTML = html;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
     }
+
+    // Inicializa carregando o chat vazio do tutor
+    loadTutorChat();
 </script>
 
 </body>
