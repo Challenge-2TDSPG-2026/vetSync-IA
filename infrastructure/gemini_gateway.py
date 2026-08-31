@@ -5,6 +5,8 @@ from google.genai import types
 from domain.models.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, CheckinResult, OrchestratorResult
 from infrastructure.prompts import SCHEDULE_SYSTEM_INSTRUCTION, TRIAGE_SYSTEM_INSTRUCTION, CHECKIN_SYSTEM_INSTRUCTION
 from application.ports import IAssistantGateway, AssistantGatewayError
+from infrastructure.tools.scheduling_tools import consultar_disponibilidade
+from infrastructure.tools.doctor_tools import consultar_historico
 
 class GeminiGateway(IAssistantGateway):
     def __init__(self):
@@ -58,17 +60,6 @@ class GeminiGateway(IAssistantGateway):
                 full_prompt += f"Histórico de mensagens:\n{history_text}\n\n"
                 
             full_prompt += f"Contexto opcional do tutor/pets: {json.dumps(context)}\n\n" if context else ""
-
-            def consultar_disponibilidade(data_referencia: str) -> list[str]:
-                """Consulta a disponibilidade de horários na agenda da clínica para uma determinada data. Ex: 'hoje', 'amanha', '2025-10-10'."""
-                print(f"-> [Function Calling] IA consultou a data: {data_referencia}")
-                data_lower = data_referencia.lower()
-                if "hoje" in data_lower:
-                    return ["14:00", "15:30", "17:00"]
-                elif "amanh" in data_lower:
-                    return ["09:00", "11:00"]
-                else:
-                    return ["10:00", "13:00", "16:00"]
 
             # Função auxiliar para retentativas em caso de 503
             import time
@@ -219,11 +210,6 @@ class GeminiGateway(IAssistantGateway):
         try:
             from domain.models.models import DoctorCommandIntent
             
-            def consultar_historico(tutor_name: str, pet_name: str = None) -> str:
-                """Busca no banco de dados o histórico clínico, receitas e prontuários do pet do tutor informado."""
-                print(f"-> [Function Calling] IA buscou histórico de: {tutor_name}, pet: {pet_name}")
-                return f"Histórico de {tutor_name}: Última consulta há 2 meses. Receita: Dipirona gotas. Prontuário: Animal chegou com dores leves, mas liberado bem."
-
             system_instruction = (
                 "Você é a assistente do médico veterinário (VetSync). O médico pode pedir duas coisas: "
                 "1) Puxar o histórico de um paciente (use a ferramenta consultar_historico). "
