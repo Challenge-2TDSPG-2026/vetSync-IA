@@ -45,10 +45,9 @@ def processar_chat_universal(
     Lê a mensagem, usa a IA para classificar a intenção e então redireciona para o UseCase correto.
     """
     try:
-        # 1. Enriquecer o contexto com os dados do banco (Simulado aqui, mas em prod viria do Oracle)
-        contexto_enriquecido = request.contexto or {}
+        # 1. Preserva somente o contexto real enviado pelo cliente autenticado.
+        contexto_enriquecido = dict(request.contexto or {})
         contexto_enriquecido["tutor_id"] = usuario_logado["username"]
-        contexto_enriquecido["pets_do_tutor"] = ["Thor (Cachorro)", "Nina (Gato)"] # Simulação de busca no banco
 
         # 2. Orquestração: Descobrir o que o usuário quer
         orquestracao = use_case.execute(request.message)
