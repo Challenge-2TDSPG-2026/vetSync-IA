@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
 from main import app
 from application.ports import IAssistantGateway, AssistantGatewayError
-from presentation.routers import get_gateway
-from domain.models.models import ClinicalPostCarePlan, SchedulingIntent
+from presentation.assistant_routers import get_gateway
+from domain.models.models import ClinicalPostCarePlan, SchedulingIntent, OrchestratorResult
 
 class MockAssistantGateway(IAssistantGateway):
     def __init__(self, fail=False):
@@ -21,7 +21,7 @@ class MockAssistantGateway(IAssistantGateway):
             message_draft="Olá Ana, o Bidu precisa voltar em 15 dias."
         )
 
-    def parse_scheduling_intent(self, prompt: str) -> SchedulingIntent:
+    def parse_scheduling_intent(self, prompt: str, context: dict = None) -> SchedulingIntent:
         if self.fail:
             raise AssistantGatewayError("Erro simulado")
         return SchedulingIntent(
@@ -55,6 +55,14 @@ class MockAssistantGateway(IAssistantGateway):
             red_flags=["febre"],
             notify_veterinarian=True,
             message_draft="Rascunho checkin"
+        )
+
+    def orchestrate_intent(self, prompt: str) -> OrchestratorResult:
+        if self.fail:
+            raise AssistantGatewayError("Erro simulado")
+        return OrchestratorResult(
+            intent_category="POS_ATENDIMENTO",
+            reasoning="Identificada intenção de pós atendimento"
         )
 
 client = TestClient(app)

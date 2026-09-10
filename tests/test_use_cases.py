@@ -20,7 +20,7 @@ class MockAssistantGateway(IAssistantGateway):
             message_draft="Olá João, o Rex precisa voltar em 7 dias."
         )
 
-    def parse_scheduling_intent(self, prompt: str) -> SchedulingIntent:
+    def parse_scheduling_intent(self, prompt: str, context: dict = None) -> SchedulingIntent:
         if self.should_fail:
             raise AssistantGatewayError("Mocked failure")
         return SchedulingIntent(
@@ -54,6 +54,15 @@ class MockAssistantGateway(IAssistantGateway):
             red_flags=["febre"],
             notify_veterinarian=True,
             message_draft="Rascunho checkin"
+        )
+
+    def orchestrate_intent(self, prompt: str):
+        from domain.models.models import OrchestratorResult
+        if self.should_fail:
+            raise AssistantGatewayError("Mocked failure")
+        return OrchestratorResult(
+            intent_category="POS_ATENDIMENTO",
+            reasoning="Identificada intenção de pós atendimento"
         )
 
 @pytest.fixture

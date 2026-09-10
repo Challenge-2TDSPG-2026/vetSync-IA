@@ -3,9 +3,10 @@ import sys
 from dotenv import load_dotenv
 
 # Garante que as importações a partir da raiz do projeto funcionem
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from application.use_cases import ProcessPostCareIntentUseCase
+from infrastructure.gemini_gateway import GeminiGateway
 
 def main():
     load_dotenv()
@@ -17,7 +18,8 @@ def main():
 
     print("Iniciando o caso de uso...")
     try:
-        use_case = ProcessPostCareIntentUseCase()
+        gateway = GeminiGateway()
+        use_case = ProcessPostCareIntentUseCase(gateway=gateway)
     except Exception as e:
         print(f"Erro ao inicializar UseCase: {e}")
         return
