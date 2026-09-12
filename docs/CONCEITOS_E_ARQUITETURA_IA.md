@@ -69,18 +69,49 @@ A IA atua em quatro frentes especializadas de apoio à decisão:
 ## 3. Catálogo e Dicionário de Dados da IA
 
 A tabela abaixo descreve os dados consumidos, transformados e gerados pelo microsserviço de IA:
+Em atendimento aos requisitos do Challenge 2026, a IA processa e correlaciona dados estruturados e não-estruturados da jornada de cuidado:
+
+### 3.1 Mapeamento de Entidades do Cuidado Veterinário
+
+* **Perfil do Pet (`PetProfile`):**
+  * *Campos:* Nome (`pet_name`), Espécie (`patient_species`: Canina, Felina, etc.), Raça (`breed`), Idade/Data de Nascimento (`age`), Peso (`weight`) e Sexo/Castração (`neutered`).
+  * *Uso na IA:* Fornece base de calibração fisiológica para o *System Prompt* do Gemini (ex.: tolerância a sintomas e cálculos temporais diferem entre felinos e caninos).
+* **Histórico Clínico e Consultas Anteriores (`ClinicalHistory`):**
+  * *Campos:* Diagnósticos prévios, histórico cirúrgico (`past_surgeries`), registros de atendimentos anteriores (`consultation_records`) e comorbidades crônicas (ex.: cardiopatias, insuficiência renal).
+  * *Uso na IA:* Permite contextualizar relatos de sintomas e pós-cirúrgicos sem que o tutor precise repetir todo o prontuário.
+* **Vacinas e Imunização (`VaccineCard`):**
+  * *Campos:* Imunobiológicos aplicados (V8/V10, Antirrábica, FeLV), datas de aplicação e datas de revacinação previstas (`due_vaccine_date`).
+  * *Uso na IA:* Identificação ativa de janelas de revacinação para sugestão preditiva de agendamento preventivo no *Health Loop* e descarte de patologias imunopreveníveis.
+* **Medicamentos e Prescrições (`Medications`):**
+  * *Campos:* Medicamentos em uso contínuo, antibióticos e anti-inflamatórios recentes, dosagem prescrita e reações adversas/alergias (`allergies`).
+  * *Uso na IA:* Avaliação na triagem de reações adversas a fármacos e montagem automática do plano estruturado de pós-atendimento (`attach_prescription: true`).
+* **Comportamento e Sinais Vitais Relatados (`PetBehavior`):**
+  * *Campos:* Padrão alimentar/apetite (anorexia, hiporexia), nível de atividade (letargia, prostração), ingestão hídrica, êmese e alterações comportamentais (gemidos, agressividade induzida por dor).
+  * *Uso na IA:* Variáveis decisivas ponderadas pelo modelo durante a classificação de risco (`urgency_level`).
+
+---
+
+### 3.2 Dicionário de Dados de Entrada e Saída do Microsserviço
 
 | Entidade / Campo | Tipo | Origem | Destino | Finalidade na IA |
 | :--- | :---: | :---: | :---: | :--- |
 | `prompt` / `message` | `str` | Tutor ou Veterinário | SIA / Gemini | Entrada em linguagem natural livre. |
+| `prompt` / `message` | `str` | Tutor ou Veterinário | SIA / Gemini | Entrada em linguagem natural livre (texto ou transcrição de áudio). |
 | `history` | `list[dict]` | Mobile / Sessão | Gemini Context | Histórico de mensagens anteriores para manter coerência multi-turn. |
 | `patient_species` | `str` | App / Banco de Dados | Gemini System Prompt | Adaptação do contexto fisiológico (cão, gato, ave, etc.). |
 | `days_post_surgery` | `int` | Prontuário / Agenda | Gemini Context | Avaliação da linha temporal esperada de cicatrização pós-operatória. |
+| `vaccine_status` | `dict` | Banco de Dados / Core | Gemini Context | Contexto de imunização para sugestão de agendamento preventivo. |
+| `current_meds` | `list[str]` | Prontuário / Core | Gemini Context | Fármacos em uso para checagem cruzada de interações e sintomas. |
 | `urgency_level` | `str` | Gemini (`TriageResult`) | App / Equipe Médica | Categorização estrita: `EMERGENCIA`, `URGENCIA`, `ROTINA`, `ADMINISTRATIVO`. |
 | `red_flags` | `list[str]` | Gemini (`CheckinResult`) | Dashboard Vet | Lista de sinais de complicação identificados no relato. |
 | `action` | `str` | Gemini (`SchedulingIntent`)| Backend Java / Motor de Agenda | Ação detectada: `CONSULTAR`, `RESERVAR`, `CANCELAR`, `REAGENDAR`. |
 | `days_until_follow_up`| `int` | Gemini (`ClinicalPostCarePlan`)| Agenda / Notificações | Cálculo automático do dia exato para o retorno do paciente. |
 | `message_draft` | `str` | Gemini | Notificação / Tutor | Rascunho empático pronto para envio ao tutor. |
+| `identified_symptoms`| `list[str]` | Gemini (`TriageResult`) | Prontuário / Vet | Sintomas clínicos normalizados extraídos do relato livre do tutor. |
+| `red_flags` | `list[str]` | Gemini (`CheckinResult`) | Dashboard Vet | Lista de sinais clínicos de complicação detectados no pós-operatório. |
+| `action` | `str` | Gemini (`SchedulingIntent`)| Backend Core / Agenda | Ação detectada: `CONSULTAR`, `RESERVAR`, `CANCELAR`, `REAGENDAR`. |
+| `days_until_follow_up`| `int` | Gemini (`ClinicalPostCarePlan`)| Agenda / Notificações | Cálculo automático do dia exato para retorno clínico do paciente. |
+| `message_draft` | `str` | Gemini | Notificação / Tutor | Rascunho empático e humanizado pronto para envio ao tutor. |
 
 ---
 
@@ -100,6 +131,50 @@ A solução adotou **Modelos de Linguagem de Grande Escala (LLM - Google Gemini)
 ---
 
 ## 5. Diagrama Arquitetural Completo de Integração
+## 5. Diagramas Arquiteturais de Integração
+
+### 5.1 Diagrama de Componentes e Topologia (Visão Macro do Ecossistema)
+
+```mermaid
+flowchart TD
+    subgraph ClientLayer["Camada de Apresentação (Clientes)"]
+        TutorMobile["📱 App Mobile ClyvoVet (React Native / Expo)"]
+        VetWeb["💻 Painel da Clínica / Veterinário"]
+    end
+
+    subgraph BackendLayer["Camada de Negócio e Orquestração"]
+        BackendCore["⚙️ Backend Core VetSync (Spring Boot / REST API)"]
+        SIAService["🤖 Microsserviço SIA (FastAPI / Python 3.12)"]
+    end
+
+    subgraph IALayer["Serviços de Inteligência Artificial"]
+        GeminiLLM["☁️ Google Gemini API (gemini-2.5-flash / Structured Outputs)"]
+        FunctionCalling["🛠️ Ferramentas Clínicas (Consultar Agenda / Histórico)"]
+    end
+
+    subgraph DataLayer["Camada de Dados e Persistência"]
+        OracleDB[("🏛️ Oracle Database 21c (Prontuários, Pets, Consultas)")]
+        LocalCache[("🗄️ SQLite / Cache Local de Sessões")]
+    end
+
+    TutorMobile -->|"1. Comandos voz/texto, triagem e check-in"| SIAService
+    TutorMobile -->|"2. Requisições de negócio padrão"| BackendCore
+    VetWeb -->|"3. Gestão de atendimentos e agenda"| BackendCore
+
+    SIAService -->|"4. Autenticação e Sincronização"| BackendCore
+    SIAService -->|"5. Prompt enriquecido + Schema Pydantic"| GeminiLLM
+    GeminiLLM -->|"6. Function Calling dinâmico"| FunctionCalling
+    FunctionCalling -->|"7. Consulta vagas / médicos"| BackendCore
+    GeminiLLM -->|"8. JSON Estruturado Validado"| SIAService
+
+    SIAService -->|"9. Gravação de alertas / triagens"| OracleDB
+    SIAService -.->|"10. Fallback / Dev"| LocalCache
+    BackendCore -->|"11. Transações relacionais ACID"| OracleDB
+```
+
+---
+
+### 5.2 Diagrama de Sequência de Integração e Fluxo de Dados
 
 ```mermaid
 sequenceDiagram
@@ -109,23 +184,34 @@ sequenceDiagram
     participant Java as Backend Core (Spring Boot)
     participant SIA as Microsserviço SIA (FastAPI)
     participant Gemini as Google Gemini 3.5 Flash Lite
+    participant Gemini as Google Gemini (Structured Output)
+    participant Core as Backend Core (VetSync)
     participant DB as Oracle Database 21c
 
     Tutor->>App: Relato de Sintomas / Comando de Voz
+    Tutor->>App: Relato de Sintomas / Áudio / Mensagem
     App->>SIA: POST /api/v1/assistant/triage-inbound
     activate SIA
     Note over SIA: Validação do Schema Pydantic
     SIA->>Gemini: generate_content(prompt, schema=TriageResult)
+    Note over SIA: Enriquecimento de Contexto (Espécie, Histórico, Vacinas)
+    SIA->>Gemini: generate_content(prompt + context, schema=TriageResult)
     activate Gemini
     Gemini-->>SIA: JSON Estruturado (urgency_level, symptoms, draft)
+    Gemini-->>SIA: JSON Estruturado (urgency_level, symptoms, draft, notify_team)
     deactivate Gemini
     
     alt Urgência == EMERGENCIA
         SIA->>Java: Notificar Equipe de Plantão
         Java->>DB: Grava Alerta Clínico
+    alt urgency_level == 'EMERGENCIA' ou notify_team == true
+        SIA->>Core: Notificar Equipe de Emergência da Clínica
+        Core->>DB: Grava Alerta Clínico Prioritário
     end
 
+    SIA->>DB: Persiste registro de triagem auditável
     SIA-->>App: Resposta Estruturada com Ações Recomendadas
     deactivate SIA
     App-->>Tutor: Exibe orientações seguras e rascunho de agendamento
+    App-->>Tutor: Exibe orientações seguras e botão de contato com a clínica
 ```
