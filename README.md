@@ -12,8 +12,7 @@ A **SIA** é a assistente virtual e microsserviço inteligente de rotinas veteri
 * Pedro Henrique Brum Lopes (RM: 561780)
 
 ### 🎬 Vídeo Pitch de Apresentação (~5 minutos)
-* 📺 **Link do Vídeo no YouTube (Modo Não Listado):** `https://youtu.be/[INSERIR_LINK_AQUI]`
-* 📄 **Roteiro e Minutagem Técnica:** [docs/ROTEIRO_VIDEO_PITCH.md](docs/ROTEIRO_VIDEO_PITCH.md)
+* 📺 **Link do Vídeo no YouTube (Modo Não Listado):** `https://youtu.be/lwjRRtU1Tx4`
 
 ---
 
