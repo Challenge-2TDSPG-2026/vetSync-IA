@@ -95,7 +95,6 @@ Em atendimento aos requisitos do Challenge 2026, a IA processa e correlaciona da
 
 | Entidade / Campo | Tipo | Origem | Destino | Finalidade na IA |
 | :--- | :---: | :---: | :---: | :--- |
-| `prompt` / `message` | `str` | Tutor ou Veterinário | SIA / Gemini | Entrada em linguagem natural livre. |
 | `prompt` / `message` | `str` | Tutor ou Veterinário | SIA / Gemini | Entrada em linguagem natural livre (texto ou transcrição de áudio). |
 | `history` | `list[dict]` | Mobile / Sessão | Gemini Context | Histórico de mensagens anteriores para manter coerência multi-turn. |
 | `patient_species` | `str` | App / Banco de Dados | Gemini System Prompt | Adaptação do contexto fisiológico (cão, gato, ave, etc.). |
@@ -103,10 +102,6 @@ Em atendimento aos requisitos do Challenge 2026, a IA processa e correlaciona da
 | `vaccine_status` | `dict` | Banco de Dados / Core | Gemini Context | Contexto de imunização para sugestão de agendamento preventivo. |
 | `current_meds` | `list[str]` | Prontuário / Core | Gemini Context | Fármacos em uso para checagem cruzada de interações e sintomas. |
 | `urgency_level` | `str` | Gemini (`TriageResult`) | App / Equipe Médica | Categorização estrita: `EMERGENCIA`, `URGENCIA`, `ROTINA`, `ADMINISTRATIVO`. |
-| `red_flags` | `list[str]` | Gemini (`CheckinResult`) | Dashboard Vet | Lista de sinais de complicação identificados no relato. |
-| `action` | `str` | Gemini (`SchedulingIntent`)| Backend Java / Motor de Agenda | Ação detectada: `CONSULTAR`, `RESERVAR`, `CANCELAR`, `REAGENDAR`. |
-| `days_until_follow_up`| `int` | Gemini (`ClinicalPostCarePlan`)| Agenda / Notificações | Cálculo automático do dia exato para o retorno do paciente. |
-| `message_draft` | `str` | Gemini | Notificação / Tutor | Rascunho empático pronto para envio ao tutor. |
 | `identified_symptoms`| `list[str]` | Gemini (`TriageResult`) | Prontuário / Vet | Sintomas clínicos normalizados extraídos do relato livre do tutor. |
 | `red_flags` | `list[str]` | Gemini (`CheckinResult`) | Dashboard Vet | Lista de sinais clínicos de complicação detectados no pós-operatório. |
 | `action` | `str` | Gemini (`SchedulingIntent`)| Backend Core / Agenda | Ação detectada: `CONSULTAR`, `RESERVAR`, `CANCELAR`, `REAGENDAR`. |
@@ -130,7 +125,6 @@ A solução adotou **Modelos de Linguagem de Grande Escala (LLM - Google Gemini)
 
 ---
 
-## 5. Diagrama Arquitetural Completo de Integração
 ## 5. Diagramas Arquiteturais de Integração
 
 ### 5.1 Diagrama de Componentes e Topologia (Visão Macro do Ecossistema)
@@ -181,29 +175,21 @@ sequenceDiagram
     autonumber
     actor Tutor as Tutor / Veterinário
     participant App as App Mobile (Expo / React Native)
-    participant Java as Backend Core (Spring Boot)
     participant SIA as Microsserviço SIA (FastAPI)
-    participant Gemini as Google Gemini 3.5 Flash Lite
     participant Gemini as Google Gemini (Structured Output)
     participant Core as Backend Core (VetSync)
     participant DB as Oracle Database 21c
 
-    Tutor->>App: Relato de Sintomas / Comando de Voz
     Tutor->>App: Relato de Sintomas / Áudio / Mensagem
     App->>SIA: POST /api/v1/assistant/triage-inbound
     activate SIA
     Note over SIA: Validação do Schema Pydantic
-    SIA->>Gemini: generate_content(prompt, schema=TriageResult)
     Note over SIA: Enriquecimento de Contexto (Espécie, Histórico, Vacinas)
     SIA->>Gemini: generate_content(prompt + context, schema=TriageResult)
     activate Gemini
-    Gemini-->>SIA: JSON Estruturado (urgency_level, symptoms, draft)
     Gemini-->>SIA: JSON Estruturado (urgency_level, symptoms, draft, notify_team)
     deactivate Gemini
     
-    alt Urgência == EMERGENCIA
-        SIA->>Java: Notificar Equipe de Plantão
-        Java->>DB: Grava Alerta Clínico
     alt urgency_level == 'EMERGENCIA' ou notify_team == true
         SIA->>Core: Notificar Equipe de Emergência da Clínica
         Core->>DB: Grava Alerta Clínico Prioritário
@@ -212,6 +198,5 @@ sequenceDiagram
     SIA->>DB: Persiste registro de triagem auditável
     SIA-->>App: Resposta Estruturada com Ações Recomendadas
     deactivate SIA
-    App-->>Tutor: Exibe orientações seguras e rascunho de agendamento
     App-->>Tutor: Exibe orientações seguras e botão de contato com a clínica
 ```
