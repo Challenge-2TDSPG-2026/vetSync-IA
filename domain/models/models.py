@@ -23,6 +23,25 @@ class SchedulingIntent(BaseModel):
     state: Optional[str] = Field(description="Estado sugerido do agendamento (PENDENTE_DOUTOR, CONFIRMADO_DOUTOR, AGUARDANDO_TUTOR, etc.)")
     message_draft: str = Field(description="Resposta sugerida da IA para o doutor ou tutor")
 
+
+class SchedulingConversationDecision(BaseModel):
+    """Decisão estruturada para o fluxo conversacional de agendamento do tutor."""
+
+    message: str = Field(description="Resposta curta e natural que será exibida ao tutor.")
+    create_event: bool = Field(
+        description="Só é verdadeiro quando o tutor já escolheu explicitamente todos os campos obrigatórios."
+    )
+    id_pet: Optional[int] = Field(default=None, description="ID do pet escolhido pelo tutor.")
+    id_tipo_evento: Optional[int] = Field(default=None, description="ID do tipo de evento escolhido pelo tutor.")
+    id_veterinario: Optional[int] = Field(default=None, description="ID do veterinário escolhido pelo tutor.")
+    dt_evento: Optional[str] = Field(
+        default=None, description="Data absoluta no formato YYYY-MM-DD, nunca uma expressão relativa."
+    )
+    hr_evento: Optional[str] = Field(default=None, description="Horário no formato HH:mm.")
+    ds_observacao: Optional[str] = Field(
+        default=None, description="Observação que o tutor informou; é opcional no contrato Java."
+    )
+
 class TriageInboundRequest(BaseModel):
     message: str
     history: Optional[list[ConversationMessage]] = None

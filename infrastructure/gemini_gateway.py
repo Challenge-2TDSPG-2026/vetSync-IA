@@ -1,8 +1,10 @@
 import os
 import json
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from google import genai
 from google.genai import types
-from domain.models.models import ClinicalPostCarePlan, SchedulingIntent, TriageResult, CheckinResult, OrchestratorResult
+from domain.models.models import ClinicalPostCarePlan, SchedulingIntent, SchedulingConversationDecision, TriageResult, CheckinResult, OrchestratorResult
 from infrastructure.prompts import SCHEDULE_SYSTEM_INSTRUCTION, TRIAGE_SYSTEM_INSTRUCTION, CHECKIN_SYSTEM_INSTRUCTION
 from application.ports import IAssistantGateway, AssistantGatewayError
 from infrastructure.tools.scheduling_tools import consultar_disponibilidade
@@ -124,9 +126,6 @@ class GeminiGateway(IAssistantGateway):
                 for item in history[-20:]
                 if isinstance(item, dict) and item.get("text")
             )
-            pet_context = context.get("pet_ativo")
-            context_text = json.dumps(pet_context, ensure_ascii=False) if pet_context else "não informado"
-
             system_instruction = """Você é a SIA, assistente conversacional da clínica veterinária VetSync.
 Converse com naturalidade, sem mostrar categorias, rótulos técnicos, classificação de intenção ou raciocínio interno.
 
@@ -138,13 +137,11 @@ Regras de saúde:
 - Não diga que o pet está clinicamente bem. Se o tutor disser que o pet está normal ou parece bem, comemore a boa notícia sem validar clinicamente e ofereça um check-up preventivo para maior tranquilidade.
 
 Regras de agendamento:
-- Use a ferramenta consultar_disponibilidade antes de informar horários. Nunca invente disponibilidade e nunca afirme que uma consulta foi reservada, pois você apenas consulta a agenda.
-- O histórico é parte da conversa atual. Quando o tutor escolher um horário que você ofereceu anteriormente, mantenha a mesma data já combinada. Por exemplo: se você ofereceu horários para amanhã e o tutor escolheu 09h, trate a escolha como amanhã às 09h, e não como hoje.
-- Se faltar uma informação para avançar, faça uma pergunta curta e objetiva.
+- Não invente horários nem afirme que uma consulta foi reservada. O fluxo de agendamento é tratado separadamente, com dados reais da agenda.
+- Nunca presuma que o pet ativo é o pet do atendimento. Também não mencione um pet numa saudação genérica.
 
 Saudações e temas fora da clínica devem receber respostas humanas, breves e educadas; não responda com uma recusa padronizada."""
             conversation = (
-                f"Contexto do pet: {context_text}\n\n"
                 f"Histórico da conversa:\n{history_text or '(início da conversa)'}\n\n"
                 f"Mensagem atual do tutor: {prompt}"
             )
@@ -152,7 +149,6 @@ Saudações e temas fora da clínica devem receber respostas humanas, breves e e
                 model=self.model_id,
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
-                    tools=[consultar_disponibilidade],
                     temperature=0.2,
                 ),
             )
@@ -164,6 +160,60 @@ Saudações e temas fora da clínica devem receber respostas humanas, breves e e
             raise
         except Exception as e:
             raise AssistantGatewayError(f"Erro ao responder o tutor no Gemini: {str(e)}")
+
+    def decidir_agendamento_tutor(
+        self, prompt: str, context: dict, catalogos: dict
+    ) -> SchedulingConversationDecision:
+        """Transforma uma etapa do diálogo em uma decisão verificável pelo backend.
+
+        A decisão não contém disponibilidade inventada: o cadastro final continua
+        condicionado ao retorno de sucesso de ``POST /eventos`` no roteador.
+        """
+        try:
+            history = context.get("history") or []
+            history_text = "\n".join(
+                f"{'Tutor' if item.get('role') == 'user' else 'SIA'}: {item.get('text', '')}"
+                for item in history[-20:]
+                if isinstance(item, dict) and item.get("text")
+            )
+            data_atual = datetime.now(ZoneInfo("America/Sao_Paulo")).date().isoformat()
+            system_instruction = """Você é a SIA no fluxo de agendamento da VetSync.
+Retorne exclusivamente o JSON do schema informado.
+
+Dados de referência:
+- A data atual no fuso America/Sao_Paulo está informada no contexto. Converta toda data relativa para YYYY-MM-DD antes de retorná-la. Por exemplo, se hoje é 2026-09-18 e o tutor disser "dia 20", a data é 2026-09-20; na mensagem ao tutor, exiba 20/09/2026.
+- Os catálogos recebidos são a única fonte de pets, tipos de evento e veterinários. Nunca invente nomes, IDs, horários ou disponibilidade.
+
+Ordem obrigatória de escolha para uma consulta/evento: pet, tipo de evento, veterinário, data e horário. Todos os cinco campos são obrigatórios pelo Java. Pergunte somente o próximo campo ainda ausente, de forma curta, e mostre opções usando os nomes reais do catálogo quando necessário.
+- Mesmo que exista pet_ativo, não o selecione nem o cite automaticamente. Se o tutor não tiver nomeado um pet de modo inequívoco, pergunte qual animal será atendido, considerando todos os pets cadastrados.
+- O tutor não precisa informar nome completo ou telefone: ele já está autenticado e esses campos não pertencem ao POST /eventos.
+- Não ofereça uma lista de horários como se ela fosse disponibilidade real: o contrato Java atual não expõe consulta de slots livres. Peça que o tutor escolha/informe o horário desejado e deixe a confirmação final para o backend.
+- Defina create_event como true somente quando o tutor tiver escolhido explicitamente os cinco campos e a mensagem atual ou o histórico trouxer uma confirmação/seleção final inequívoca. Caso contrário, false.
+- Nunca diga que está agendado quando create_event for true; diga que vai confirmar a reserva. O backend substitui a resposta apenas depois do POST retornar sucesso.
+"""
+            contents = (
+                f"Data atual: {data_atual}\n\n"
+                f"Catálogos reais: {json.dumps(catalogos, ensure_ascii=False)}\n\n"
+                f"Histórico:\n{history_text or '(início da conversa)'}\n\n"
+                f"Mensagem atual do tutor: {prompt}"
+            )
+            response = self.client.models.generate_content(
+                model=self.model_id,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    response_mime_type="application/json",
+                    response_schema=SchedulingConversationDecision,
+                    temperature=0.0,
+                ),
+            )
+            if not response.text:
+                raise AssistantGatewayError("API returned empty text for scheduling conversation.")
+            return SchedulingConversationDecision(**json.loads(response.text))
+        except AssistantGatewayError:
+            raise
+        except Exception as e:
+            raise AssistantGatewayError(f"Erro ao decidir agendamento no Gemini: {str(e)}")
 
     def parse_triage_intent(self, prompt: str, context: dict = None) -> TriageResult:
         try:
