@@ -1,6 +1,6 @@
 # Documentação de Endpoints: API Assistente Veterinário (vetSync-IA)
 
-Este documento detalha os endpoints disponíveis na aplicação atual, desenvolvida em **FastAPI**. A API utiliza Inteligência Artificial (Google GenAI) para interpretar comandos em linguagem natural e estruturar planos de pós-atendimento, triagem, check-ins e agendamentos.
+Este documento detalha os endpoints disponíveis na aplicação atual, desenvolvida em **FastAPI**. A API utiliza Inteligência Artificial (Google GenAI) para conversar com tutores, estruturar planos de pós-atendimento, acompanhar check-ins e apoiar agendamentos.
 
 Atualmente, o projeto está estruturado em duas categorias principais de endpoints:
 1. **Módulo IA + Oracle:** Novas rotas que, além de interpretar a intenção com a IA, já preparam a lógica de persistência e manipulação no banco de dados Oracle.
@@ -22,10 +22,10 @@ Estas rotas cuidam de receber os dados do front-end/tutor, interpretá-los usand
     *   **Objetivo:** Recebe instruções médicas do veterinário (ex: áudio transcrito ou texto corrido), a IA estrutura o prontuário e salva as pendências ou agenda o retorno no Oracle.
     *   **Exemplo de Payload:** `{"prompt": "Animal bem, pedir para voltar daqui a 7 dias e prescrever dipirona"}`
 
-### Triagem de Risco (`TriageResult`)
-*   **`POST /api/v1/ia/triagens/processar`**
-    *   **Objetivo:** Recebe os sintomas descritos pelo tutor antes de chegar na clínica. A IA classifica o risco (ex: `EMERGENCIA`, `NORMAL`), salva a triagem no Oracle e sinaliza alertas para a equipe se necessário.
-    *   **Exemplo de Payload:** `{"message": "Meu cachorro foi atropelado e está vomitando", "pet_id": "123", "patient_species": "CACHORRO"}`
+### Conversa com o Tutor
+*   **`POST /api/v1/ia/orquestrador/processar`**
+    *   **Objetivo:** Responde de forma natural, usando o histórico e o pet ativo. Não classifica risco ou urgência e não faz diagnóstico; em dúvidas de saúde, orienta avaliação presencial na clínica.
+    *   **Exemplo de Payload:** `{"message": "A Morgana caiu da escada. Devo levá-la?", "contexto": {"pet_ativo": {"nome": "Morgana"}}}`
 
 ### Check-in Pós-Cirúrgico (`CheckinResult`)
 *   **`POST /api/v1/ia/checkins/processar`**
@@ -42,8 +42,6 @@ Rotas de base originais da aplicação que apenas utilizam o *Gateway* de IA (`G
     *   Estrutura planos clínicos de pós-atendimento. Retorna um objeto do tipo `ClinicalPostCarePlan`.
 *   **`POST /api/v1/assistant/parse-scheduling`**
     *   Interpreta intenções de agenda do tutor. Retorna um objeto do tipo `SchedulingIntent`.
-*   **`POST /triage-inbound`**
-    *   Classifica o nível de risco a partir dos sintomas informados. Retorna um objeto do tipo `TriageResult`.
 *   **`POST /parse-checkin-response`**
     *   Avalia a recuperação de um paciente recém-operado. Retorna um objeto do tipo `CheckinResult`.
 

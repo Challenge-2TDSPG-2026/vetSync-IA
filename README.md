@@ -33,8 +33,8 @@ A **SIA** é a assistente virtual e microsserviço inteligente de rotinas veteri
 O setor veterinário enfrenta a chamada **"cultura da emergência"**: segundo dados da Clyvo Vet, **60% das utilizações dos planos de saúde ocorrem no pronto-socorro** (com custo médio superior a R$ 800,00 por ocorrência). O tutor médio só procura auxílio quando o pet já está em sofrimento agudo.
 
 A SIA atua diretamente na quebra dessa inércia por meio de um **Ciclo Contínuo de Cuidado (*Health Loop*)**:
-- **Triagem ativa:** Identifica precocemente gravidades sem fechar diagnóstico clínico invasivo;
-- **Acompanhamento cirúrgico (*Check-in*):** Detecta sinais de alerta (*red flags*) na cicatrização pós-operatória;
+- **Atendimento conversacional responsável:** Acolhe o tutor, não faz diagnóstico ou classificação clínica e direciona dúvidas de saúde para avaliação presencial;
+- **Prevenção e acompanhamento:** Valoriza relatos positivos e oferece check-ups preventivos para dar tranquilidade ao tutor;
 - **Agendamento por linguagem natural:** Elimina a fricção de reservas por meio de *Function Calling*;
 - **Produtividade clínica:** Converte notas de voz e comandos do veterinário em planos estruturados de pós-atendimento e altas hospitalares.
 
@@ -50,14 +50,14 @@ Permite ao médico ditar ou digitar orientações pós-consulta. A IA extrai dia
 ### 2.2 Agendamento Inteligente (`/api/v1/assistant/parse-scheduling`)
 Interpreta comandos como *"marcar retorno do Thor em 7 dias à tarde"*, valida horários disponíveis através de ferramentas integradas (*Function Calling*) e estrutura a ação para o calendário.
 
-### 2.3 Triagem de Risco e Classificação de Urgência (`/api/v1/assistant/triage-inbound`)
-Canal de primeiro contato para tutores. Classifica o nível de urgência (`EMERGENCIA`, `URGENCIA`, `ROTINA`, `ADMINISTRATIVO`) de forma conservadora e aciona a equipe da clínica quando necessário.
+### 2.3 Conversa com o Tutor (`/api/v1/ia/orquestrador/processar`)
+Mantém o histórico da conversa e o contexto do pet para responder de maneira natural. Não expõe categorias, não realiza triagem nem diagnóstico; relatos de saúde são orientados para avaliação presencial na clínica.
 
 ### 2.4 Monitoramento Ativo Pós-Cirúrgico (`/api/v1/assistant/parse-checkin-response`)
 Interpreta relatos de tutores sobre a evolução de cirurgias, avaliando cicatrização e acionando o veterinário em caso de sinais críticos (*red flags*).
 
-### 2.5 Orquestrador Multimodal e Chat In-App (`/api/v1/ia/orquestrar` e `/api/v1/ia/chat`)
-Classifica automaticamente a intenção da mensagem e responde com contexto do pet e histórico multi-turn.
+### 2.5 Chat In-App (`/api/v1/in-app/chat/tutor`)
+Responde ao tutor com o histórico da conversa, sem rótulos técnicos ou classificação de intenção.
 
 ---
 
@@ -67,8 +67,8 @@ Classifica automaticamente a intenção da mensagem e responde com contexto do p
 - **SDK Oficial:** `google-genai` com o modelo `gemini-3.5-flash-lite`.
 - **Structured Outputs:** Validação 100% garantida por esquemas `Pydantic v2` via parâmetro `response_schema`.
 - **Guardrails de Segurança Clínica:**
-  - **Sem diagnósticos definitivos:** A IA atua na triagem e suporte operacional, orientando sempre a consulta presencial em quadros de risco.
-  - **Prevenção de alucinação:** Saudações são respondidas brevemente e tópicos fora do escopo veterinário (clima, esportes, política) são educadamente recusados.
+  - **Sem diagnóstico ou triagem:** A SIA não avalia gravidade, não prescreve e orienta avaliação presencial quando o tutor relata ou tem dúvida sobre a saúde do pet.
+  - **Conversa natural:** Saudações e assuntos fora da clínica recebem respostas breves e educadas, sem mensagens robóticas de classificação.
 
 ---
 
@@ -188,22 +188,19 @@ curl -X POST http://localhost:8000/api/v1/assistant/parse-intent \
 }
 ```
 
-#### 3. Triagem de Emergência no Chat do Tutor (`/api/v1/assistant/triage-inbound`)
+#### 3. Conversa de Saúde no Chat do Tutor (`/api/v1/ia/orquestrador/processar`)
 ```bash
-curl -X POST http://localhost:8000/api/v1/assistant/triage-inbound \
+curl -X POST http://localhost:8000/api/v1/ia/orquestrador/processar \
   -H "Content-Type: application/json" \
   -d '{
-    "message": "Meu gato comeu uma planta estranha, está salivando muito e com a respiração ofegante."
+    "message": "A Morgana caiu da escada. Devo levá-la à clínica?",
+    "contexto": {"pet_ativo": {"nome": "Morgana"}}
   }'
 ```
-**Resposta estruturada da IA:**
+**Resposta conversacional da IA:**
 ```json
 {
-  "urgency_level": "EMERGENCIA",
-  "identified_symptoms": ["hipersalivação", "respiração ofegante", "ingestão de planta tóxica"],
-  "suggested_action": "Encaminhar imediatamente ao pronto-socorro veterinário",
-  "auto_reply_draft": "Atenção: esses sintomas requerem avaliação veterinária imediata. Por favor, leve seu gato ao pronto-socorro da nossa clínica o mais rápido possível.",
-  "notify_team": true
+  "mensagem": "Sinto muito que isso tenha acontecido com a Morgana. Não consigo avaliá-la ou diagnosticar pelo chat; se você está em dúvida sobre levá-la, o mais seguro é trazê-la para uma avaliação presencial na clínica."
 }
 ```
 
@@ -246,4 +243,3 @@ Em conformidade com os critérios de avaliação da Sprint 3 (Disruptive Archite
 ### 8.3 Performance e Guardrails Clínicos
 * **Tempo Médio de Processamento:** Respostas de intenção estruturada geradas em menos de 1.8 segundos utilizando o modelo do Google Gemini.
 * **Guardrails Ativos:** Saudações simples foram respondidas de forma concisa e amigável sem acionar chamadas pesadas, e perguntas fora de contexto veterinário (clima, política, esportes) foram educadamente recusadas sem alucinações.
-
