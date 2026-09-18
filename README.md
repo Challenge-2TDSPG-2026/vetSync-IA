@@ -35,7 +35,7 @@ O setor veterinário enfrenta a chamada **"cultura da emergência"**: segundo da
 A SIA atua diretamente na quebra dessa inércia por meio de um **Ciclo Contínuo de Cuidado (*Health Loop*)**:
 - **Atendimento conversacional responsável:** Acolhe o tutor, não faz diagnóstico ou classificação clínica e direciona dúvidas de saúde para avaliação presencial;
 - **Prevenção e acompanhamento:** Valoriza relatos positivos e oferece check-ups preventivos para dar tranquilidade ao tutor;
-- **Agendamento por linguagem natural:** Elimina a fricção de reservas por meio de *Function Calling*;
+- **Agendamento por linguagem natural:** coleta as escolhas necessárias do tutor e cria o evento no backend Java autenticado;
 - **Produtividade clínica:** Converte notas de voz e comandos do veterinário em planos estruturados de pós-atendimento e altas hospitalares.
 
 > 📖 Para aprofundamento técnico, consulte o documento: [Conceitos e Arquitetura de IA](docs/CONCEITOS_E_ARQUITETURA_IA.md).
@@ -47,8 +47,8 @@ A SIA atua diretamente na quebra dessa inércia por meio de um **Ciclo Contínuo
 ### 2.1 Pós-Atendimento Clínico Estruturado (`/api/v1/assistant/parse-intent`)
 Permite ao médico ditar ou digitar orientações pós-consulta. A IA extrai dias para retorno, motivos, necessidade de anexos e gera o rascunho da mensagem ao tutor.
 
-### 2.2 Agendamento Inteligente (`/api/v1/assistant/parse-scheduling`)
-Interpreta comandos como *"marcar retorno do Thor em 7 dias à tarde"*, valida horários disponíveis através de ferramentas integradas (*Function Calling*) e estrutura a ação para o calendário.
+### 2.2 Agendamento Inteligente (`/api/v1/ia/orquestrador/processar`)
+Ao iniciar um agendamento, a SIA consulta no backend Java os pets do tutor, tipos de evento e veterinários. Ela pede a escolha de **pet, tipo de atendimento, veterinário, data e horário**; a data é sempre confirmada de forma absoluta (por exemplo, `dia 20` em 18/09/2026 vira `20/09/2026`). Só depois de todos os campos serem escolhidos ela encaminha o mesmo Bearer do tutor para `POST /eventos` e confirma a consulta se o Java retornar sucesso. Nome e telefone não são pedidos porque não pertencem a esse contrato.
 
 ### 2.3 Conversa com o Tutor (`/api/v1/ia/orquestrador/processar`)
 Mantém o histórico da conversa e o contexto do pet para responder de maneira natural. Não expõe categorias, não realiza triagem nem diagnóstico; relatos de saúde são orientados para avaliação presencial na clínica.
@@ -106,7 +106,10 @@ Responde ao tutor com o histórico da conversa, sem rótulos técnicos ou classi
    GEMINI_API_KEY=sua_chave_do_gemini_aqui
    ORACLE_DB_URL=oracle+oracledb://RMXXXXXX:senha@oracle.fiap.com.br:1521/?service_name=ORCL
    AUTH_JWT_SECRET=sua_chave_jwt_secreta_aqui
+   JAVA_API_BASE_URL=https://sua-api-java.example.com
    ```
+
+   `JAVA_API_BASE_URL` é obrigatória para o agendamento conversacional. Em produção, `AUTH_JWT_SECRET` deve coincidir exatamente com o segredo que assina o JWT no Java, para que o Bearer possa ser validado aqui e repassado ao Java.
 
 ---
 
