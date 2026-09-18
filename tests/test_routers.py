@@ -2,6 +2,8 @@ from fastapi.testclient import TestClient
 from main import app
 from application.ports import IAssistantGateway, AssistantGatewayError
 from presentation.assistant_routers import get_gateway
+from presentation.routers.orquestrador_router import get_gemini_gateway
+from infrastructure.auth.security import verificar_token_externo
 from domain.models.models import ClinicalPostCarePlan, SchedulingIntent, OrchestratorResult
 
 class MockAssistantGateway(IAssistantGateway):
@@ -118,4 +120,34 @@ def test_parse_scheduling_success():
     data = response.json()
     assert data["action"] == "CONSULTAR"
     
+    app.dependency_overrides.clear()
+
+
+class MockTutorConversationGateway:
+    def __init__(self):
+        self.calls = []
+
+    def responder_ao_tutor(self, prompt: str, context: dict | None = None) -> str:
+        self.calls.append((prompt, context))
+        return "Claro! Para amanhã, 09:00 continua disponível para a Morgana."
+
+
+def test_tutor_chat_preserves_history_and_returns_only_a_message():
+    gateway = MockTutorConversationGateway()
+    app.dependency_overrides[get_gemini_gateway] = lambda: gateway
+    app.dependency_overrides[verificar_token_externo] = lambda: {"username": "luiz"}
+
+    history = [
+        {"role": "user", "text": "Quero marcar uma consulta para amanhã."},
+        {"role": "assistant", "text": "Tenho 09:00 e 11:00 disponíveis amanhã."},
+        {"role": "user", "text": "As 09h"},
+    ]
+    response = client.post(
+        "/api/v1/ia/orquestrador/processar",
+        json={"message": "As 09h", "contexto": {"history": history, "pet_ativo": {"nome": "Morgana"}}},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"mensagem": "Claro! Para amanhã, 09:00 continua disponível para a Morgana."}
+    assert gateway.calls == [("As 09h", {"history": history, "pet_ativo": {"nome": "Morgana"}, "tutor_id": "luiz"})]
     app.dependency_overrides.clear()

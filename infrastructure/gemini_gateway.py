@@ -55,7 +55,7 @@ class GeminiGateway(IAssistantGateway):
         try:
             full_prompt = ""
             if context and "history" in context:
-                history = context.pop("history")
+                history = context["history"]
                 history_text = "\n".join([f"{msg['role'].capitalize()}: {msg['text']}" for msg in history])
                 full_prompt += f"Histórico de mensagens:\n{history_text}\n\n"
                 
@@ -113,6 +113,57 @@ class GeminiGateway(IAssistantGateway):
             
         except Exception as e:
             raise AssistantGatewayError(f"Erro ao processar intent de agendamento no Gemini: {str(e)}")
+
+    def responder_ao_tutor(self, prompt: str, context: dict | None = None) -> str:
+        """Gera uma resposta conversacional para o tutor, sem classificar saúde ou urgência."""
+        try:
+            context = context or {}
+            history = context.get("history") or []
+            history_text = "\n".join(
+                f"{'Tutor' if item.get('role') == 'user' else 'SIA'}: {item.get('text', '')}"
+                for item in history[-20:]
+                if isinstance(item, dict) and item.get("text")
+            )
+            pet_context = context.get("pet_ativo")
+            context_text = json.dumps(pet_context, ensure_ascii=False) if pet_context else "não informado"
+
+            system_instruction = """Você é a SIA, assistente conversacional da clínica veterinária VetSync.
+Converse com naturalidade, sem mostrar categorias, rótulos técnicos, classificação de intenção ou raciocínio interno.
+
+Seu objetivo é acolher o tutor e facilitar o atendimento presencial e o agendamento na clínica.
+
+Regras de saúde:
+- Você não realiza triagem, não determina gravidade, não identifica emergência, não diagnostica e não prescreve.
+- Se o tutor relatar queda, ferimento, dor, mal-estar, sintomas, mudança de comportamento ou perguntar se deve levar o pet, diga com empatia que não é possível avaliar ou diagnosticar pelo chat e recomende uma avaliação presencial na clínica. Se houver dúvida entre levar ou não, oriente que leve o pet para avaliação.
+- Não diga que o pet está clinicamente bem. Se o tutor disser que o pet está normal ou parece bem, comemore a boa notícia sem validar clinicamente e ofereça um check-up preventivo para maior tranquilidade.
+
+Regras de agendamento:
+- Use a ferramenta consultar_disponibilidade antes de informar horários. Nunca invente disponibilidade e nunca afirme que uma consulta foi reservada, pois você apenas consulta a agenda.
+- O histórico é parte da conversa atual. Quando o tutor escolher um horário que você ofereceu anteriormente, mantenha a mesma data já combinada. Por exemplo: se você ofereceu horários para amanhã e o tutor escolheu 09h, trate a escolha como amanhã às 09h, e não como hoje.
+- Se faltar uma informação para avançar, faça uma pergunta curta e objetiva.
+
+Saudações e temas fora da clínica devem receber respostas humanas, breves e educadas; não responda com uma recusa padronizada."""
+            conversation = (
+                f"Contexto do pet: {context_text}\n\n"
+                f"Histórico da conversa:\n{history_text or '(início da conversa)'}\n\n"
+                f"Mensagem atual do tutor: {prompt}"
+            )
+            chat = self.client.chats.create(
+                model=self.model_id,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    tools=[consultar_disponibilidade],
+                    temperature=0.2,
+                ),
+            )
+            response = chat.send_message(conversation)
+            if not response.text or not response.text.strip():
+                raise AssistantGatewayError("API returned empty text for tutor chat.")
+            return response.text.strip()
+        except AssistantGatewayError:
+            raise
+        except Exception as e:
+            raise AssistantGatewayError(f"Erro ao responder o tutor no Gemini: {str(e)}")
 
     def parse_triage_intent(self, prompt: str, context: dict = None) -> TriageResult:
         try:

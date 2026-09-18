@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from presentation.assistant_routers import router, triage_router, checkin_router
+from presentation.assistant_routers import router, checkin_router
 from dotenv import load_dotenv
 
 # Carrega variáveis de ambiente
@@ -12,30 +12,28 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configuração de CORS
+# Aceita o app publicado e servidores locais em qualquer porta de desenvolvimento.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://vetsync-theta.vercel.app"],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(router)
-app.include_router(triage_router)
 app.include_router(checkin_router)
 
 # Importando e incluindo as novas rotas que conectam IA + Banco Oracle
 from presentation.routers.agendamentos_router import router as agendamentos_oracle_router
 from presentation.routers.atendimentos_router import router as atendimentos_oracle_router
-from presentation.routers.triagens_router import router as triagens_oracle_router
 from presentation.routers.checkin_router import router as checkin_oracle_router
 from presentation.routers.orquestrador_router import router as orquestrador_router
 from presentation.routers.in_app_chat_router import router as in_app_chat_router
 
 app.include_router(agendamentos_oracle_router)
 app.include_router(atendimentos_oracle_router)
-app.include_router(triagens_oracle_router)
 app.include_router(checkin_oracle_router)
 app.include_router(orquestrador_router)
 app.include_router(in_app_chat_router)

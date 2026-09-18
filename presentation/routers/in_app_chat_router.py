@@ -57,21 +57,20 @@ def tutor_reply(req: TutorRequest, db: Session = Depends(get_db)):
         role = "user" if m.remetente == "TUTOR" else "assistant"
         history_context.append({"role": role, "text": m.texto})
     
-    # Let AI negotiate the schedule
+    # Responde ao tutor preservando o histórico, sem fazer classificação de saúde.
     gateway = GeminiGateway()
     context = {"history": history_context, "tutor_id": req.tutor_id}
-    intent = gateway.parse_scheduling_intent(req.mensagem, context=context)
+    resposta = gateway.responder_ao_tutor(req.mensagem, context=context)
 
     # Save the AI's response
-    if intent.message_draft:
+    if resposta:
         nova_msg_ia = MensagemChat(
             tutor_id=req.tutor_id,
             remetente="IA",
-            texto=intent.message_draft
+            texto=resposta
         )
         db.add(nova_msg_ia)
         db.commit()
-        return {"status": "success", "ia_reply": intent.message_draft, "intent": intent.dict()}
+        return {"status": "success", "ia_reply": resposta}
     
-    return {"status": "success", "intent": intent.dict()}
-
+    return {"status": "success"}
