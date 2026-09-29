@@ -56,6 +56,13 @@ class JavaVetSyncClient:
             raise JavaVetSyncError("A API Java devolveu uma lista de pets inválida.")
         return result
 
+    def list_events(self, bearer_token: str) -> list[dict[str, Any]]:
+        """Lista os eventos visíveis ao tutor para contextualizar o acompanhamento."""
+        result = self._get("/eventos", bearer_token)
+        if not isinstance(result, list):
+            raise JavaVetSyncError("A API Java devolveu uma lista de eventos inválida.")
+        return result
+
     def _get(self, path: str, bearer_token: str) -> Any:
         return self._request("GET", path, bearer_token)
 

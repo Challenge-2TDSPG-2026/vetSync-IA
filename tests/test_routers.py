@@ -1,4 +1,6 @@
 from fastapi.testclient import TestClient
+from datetime import datetime
+from application.booking_flow import BOOKING_TIMEZONE
 from main import app
 from application.ports import IAssistantGateway, AssistantGatewayError
 from presentation.assistant_routers import get_gateway
@@ -205,6 +207,13 @@ def test_tutor_chat_creates_event_only_from_real_catalog_choices():
         "username": "luiz@teste.com",
         "token": "token-real-do-tutor",
     }
+    today = datetime.now(BOOKING_TIMEZONE).date()
+    year, month = today.year, today.month
+    if today.day > 20:
+        month += 1
+        if month == 13:
+            year, month = year + 1, 1
+    expected_date = f"{year:04d}-{month:02d}-20"
 
     response = client.post(
         "/api/v1/ia/orquestrador/processar",
@@ -220,7 +229,7 @@ def test_tutor_chat_creates_event_only_from_real_catalog_choices():
         "idPet": 2,
         "idTipoEvento": 8,
         "idVeterinario": 4,
-        "dtEvento": "2026-09-20",
+        "dtEvento": expected_date,
         "hrEvento": "16:00",
         "dsObservacao": None,
     }

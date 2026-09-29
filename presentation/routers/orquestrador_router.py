@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from application.booking_flow import BookingFlowError, BookingFlowService, BookingSessionStore
+from application.recovery_flow import RecoveryFlowError, RecoveryFlowService, RecoverySessionStore
 from infrastructure.auth.security import verificar_token_externo
 from infrastructure.gemini_gateway import GeminiGateway
 from application.ports import AssistantGatewayError
@@ -43,12 +44,19 @@ def get_java_vetsync_client() -> JavaVetSyncClient:
 
 
 booking_session_store = BookingSessionStore()
+recovery_session_store = RecoverySessionStore()
 
 
 def get_booking_flow(
     java_client: JavaVetSyncClient = Depends(get_java_vetsync_client),
 ) -> BookingFlowService:
     return BookingFlowService(java_client, booking_session_store)
+
+
+def get_recovery_flow(
+    java_client: JavaVetSyncClient = Depends(get_java_vetsync_client),
+) -> RecoveryFlowService:
+    return RecoveryFlowService(java_client, recovery_session_store)
 
 
 def is_scheduling_turn(message: str, context: dict) -> bool:
@@ -62,6 +70,12 @@ def is_scheduling_turn(message: str, context: dict) -> bool:
     ).lower()
     keywords = ("agend", "consulta", "check-up", "checkup", "horário", "horario", "marcar", "marca", "reserva")
     return any(keyword in conversation for keyword in keywords)
+
+
+def is_recovery_turn(message: str) -> bool:
+    normalized = message.lower()
+    keywords = ("recupera", "acompanhamento", "pós-cirúrg", "pos-cirurg", "pós atendimento", "pos atendimento")
+    return any(keyword in normalized for keyword in keywords)
 
 
 def validate_event_choice(decision, catalogos: dict) -> dict | None:
@@ -140,6 +154,7 @@ def processar_chat_universal(
     usuario_logado: dict = Depends(verificar_token_externo),
     gateway: GeminiGateway | None = Depends(get_gemini_gateway),
     booking_flow: BookingFlowService = Depends(get_booking_flow),
+    recovery_flow: RecoveryFlowService = Depends(get_recovery_flow),
 ):
     """
     Entrada conversacional da SIA para o tutor.
@@ -149,6 +164,14 @@ def processar_chat_universal(
         # Preserva somente o contexto recebido e associa a conversa ao tutor autenticado.
         contexto_enriquecido = dict(request.contexto or {})
         contexto_enriquecido["tutor_id"] = usuario_logado["username"]
+
+        recovery_response = recovery_flow.respond_to_report(usuario_logado["username"], request.message)
+        if recovery_response:
+            return recovery_response.to_payload()
+        if is_recovery_turn(request.message):
+            return recovery_flow.start(
+                usuario_logado["username"], usuario_logado.get("token", "")
+            ).to_payload()
 
         # Gateways usados nos testes legados preservam o contrato anterior.
         # O fluxo real evita o modelo após o primeiro pedido de agendamento.
@@ -191,6 +214,8 @@ def processar_chat_universal(
 
         mensagem = gateway.responder_ao_tutor(request.message, contexto_enriquecido)
         return {"mensagem": mensagem}
+    except RecoveryFlowError as e:
+        return {"mensagem": str(e)}
     except BookingFlowError as e:
         return {"mensagem": str(e)}
     except Exception as e:
@@ -213,4 +238,23 @@ def selecionar_bloco_agendamento(
             usuario_logado.get("token", ""),
         ).to_payload()
     except BookingFlowError as e:
+        return {"mensagem": str(e)}
+
+
+@router.post("/acompanhamentos/sessoes/{sessao_id}/selecoes")
+def selecionar_pet_acompanhamento(
+    sessao_id: str,
+    request: SelecaoBlocoRequest,
+    usuario_logado: dict = Depends(verificar_token_externo),
+    recovery_flow: RecoveryFlowService = Depends(get_recovery_flow),
+):
+    """Busca o histórico real apenas depois de o tutor escolher o pet."""
+    try:
+        return recovery_flow.select(
+            sessao_id,
+            request.opcaoId,
+            usuario_logado["username"],
+            usuario_logado.get("token", ""),
+        ).to_payload()
+    except RecoveryFlowError as e:
         return {"mensagem": str(e)}
