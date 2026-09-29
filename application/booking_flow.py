@@ -100,12 +100,14 @@ class BookingFlowService:
 
     def start(self, message: str, tutor_id: str, bearer_token: str) -> BookingFlowResponse:
         session = self.sessions.create(tutor_id)
+        health_prefix = self._health_prefix(message)
+        session.selected["health_prefix"] = health_prefix
         requested_date = self._resolve_date(message)
         if not requested_date:
-            return self._show_date_options(session, "Para qual dia você quer a consulta?")
+            return self._show_date_options(session, f"{health_prefix}Para qual dia você quer a consulta?")
 
         session.selected["date"] = requested_date.isoformat()
-        return self._show_general_slots(session, bearer_token, self._health_prefix(message))
+        return self._show_general_slots(session, bearer_token, health_prefix)
 
     def select(self, session_id: str, option_id: str, tutor_id: str, bearer_token: str) -> BookingFlowResponse:
         session = self.sessions.get(session_id, tutor_id)
@@ -115,7 +117,7 @@ class BookingFlowService:
 
         if option.action == "DATE":
             session.selected["date"] = option.data["date"]
-            return self._show_general_slots(session, bearer_token)
+            return self._show_general_slots(session, bearer_token, session.selected.get("health_prefix", ""))
         if option.action == "SLOT":
             session.selected.update(option.data)
             return self._show_pet_options(session, bearer_token)
@@ -149,15 +151,19 @@ class BookingFlowService:
     ) -> BookingFlowResponse:
         selected_date = session.selected.get("date")
         if not selected_date:
-            return self._show_date_options(session, "Para qual dia você quer a consulta?")
+            return self._show_date_options(session, f"{prefix}Para qual dia você quer a consulta?")
         try:
             response = self.java_client.available_slots(bearer_token, selected_date, "CLINICO_GERAL")
         except JavaVetSyncError as exc:
-            raise BookingFlowError("Não consegui consultar os horários da clínica agora. Tente novamente em instantes.") from exc
+            raise BookingFlowError(
+                f"{prefix}Não consegui consultar os horários da clínica agora. Tente novamente em instantes."
+            ) from exc
 
         slots = response.get("slots") if isinstance(response, dict) else None
         if not isinstance(slots, list):
-            raise BookingFlowError("A agenda da clínica devolveu uma resposta inválida. Tente novamente em instantes.")
+            raise BookingFlowError(
+                f"{prefix}A agenda da clínica devolveu uma resposta inválida. Tente novamente em instantes."
+            )
         choices = [
             BookingOption(
                 action="SLOT",
@@ -178,7 +184,7 @@ class BookingFlowService:
         if not choices:
             return self._show_date_options(
                 session,
-                f"Não encontrei horários para clínico geral em {formatted_date}. Escolha outra data.",
+                f"{prefix}Não encontrei horários para clínico geral em {formatted_date}. Escolha outra data.",
             )
         message = f"{prefix}Encontrei horários para clínico geral em {formatted_date}."
         return self._set_block(session, "AGUARDANDO_HORARIO", "SELECIONAR_HORARIO", "Escolha um horário", choices, message)

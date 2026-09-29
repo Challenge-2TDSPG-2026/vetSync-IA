@@ -60,7 +60,7 @@ def is_scheduling_turn(message: str, context: dict) -> bool:
             if isinstance(item, dict)
         ]
     ).lower()
-    keywords = ("agend", "consulta", "horário", "horario", "marcar", "marca", "reserva")
+    keywords = ("agend", "consulta", "check-up", "checkup", "horário", "horario", "marcar", "marca", "reserva")
     return any(keyword in conversation for keyword in keywords)
 
 
