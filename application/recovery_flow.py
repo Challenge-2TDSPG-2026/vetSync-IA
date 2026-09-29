@@ -150,6 +150,9 @@ class RecoveryFlowService:
         if self._indicates_not_better(normalized):
             session.state = "CONCLUIDA"
             return RecoveryResponse(self._not_better_message(session))
+        if self._indicates_unwell(normalized):
+            session.state = "CONCLUIDA"
+            return RecoveryResponse(self._not_better_message(session))
         if self._indicates_better(normalized):
             session.state = "CONCLUIDA"
             return RecoveryResponse(self._better_message(session))
@@ -248,7 +251,7 @@ class RecoveryFlowService:
         pet = session.selected["nmPet"]
         latest = session.selected.get("latest_event") or {}
         place = self._place(latest.get("nmVeterinario") or latest.get("nmProfissionalEstetica"), latest.get("nmClinica"))
-        message = f"Sinto que {pet} ainda não esteja melhor. Como a queixa persiste, recomendo levá-lo para uma avaliação presencial"
+        message = f"Sinto muito que {pet} esteja assim. Recomendo que passe por uma avaliação presencial"
         if place:
             message += place
         message += "."
@@ -314,8 +317,12 @@ class RecoveryFlowService:
         return value.lower().translate(replacements)
 
     def _indicates_not_better(self, text: str) -> bool:
-        negative = ("nao melhor", "não melhor", "continua", "pior", "igual", "ainda manca", "ainda esta", "ainda está", "nao passou", "não passou")
+        negative = ("nao melhor", "continua", "pior", "igual", "ainda manca", "ainda esta", "nao passou", "nao esta bem", "nao ta bem", "nao esta legal", "nao ta legal")
         return any(term in text for term in negative)
+
+    def _indicates_unwell(self, text: str) -> bool:
+        indicators = ("xoxinh", "abatid", "molinh", "caidinh", "prostrad", "indispost", "nao parece bem", "esta estranho", "esta estranha")
+        return any(term in text for term in indicators)
 
     def _indicates_better(self, text: str) -> bool:
         positive = ("melhor", "bem", "normal", "recuper", "parou", "sumiu")
