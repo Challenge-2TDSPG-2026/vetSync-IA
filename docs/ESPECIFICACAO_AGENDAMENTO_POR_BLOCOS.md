@@ -108,6 +108,10 @@ idPet: definido pelo bloco de pets
 dsObservacao: opcional, informada em texto livre
 ```
 
+Nesta primeira implementação, a sessão fica em memória por 15 minutos e é
+perdida se a instância da SIA reiniciar. A persistência compartilhada deverá
+ser adicionada antes de executar mais de uma instância da API.
+
 Uma seleção direta não chama o orquestrador. O modelo pode ser usado apenas na
 entrada livre para reconhecer que o tutor quer agendar, extrair a data ou
 entender uma observação que não faça parte de uma escolha estruturada.
@@ -119,7 +123,7 @@ entender uma observação que não faça parte de uma escolha estruturada.
 Criar uma consulta autenticada de slots, proposta como:
 
 ```text
-GET /agenda/slots?data=YYYY-MM-DD&categoria=CLINICO_GERAL
+GET /agenda/slots?data=YYYY-MM-DD&modalidade=CLINICO_GERAL
 ```
 
 Resposta proposta:
@@ -130,6 +134,7 @@ Resposta proposta:
   "slots": [
     {
       "idTipoEvento": 8,
+      "nmTipoEvento": "Consulta de rotina",
       "idVeterinario": 4,
       "nmVeterinario": "Dra. Ana",
       "hrEvento": "09:00"
@@ -139,10 +144,10 @@ Resposta proposta:
 ```
 
 O Java deve calcular esses slots com a disponibilidade semanal do veterinário,
-bloqueios e eventos `AGENDADO`. O tamanho de cada atendimento deve ser uma
-configuração real do tipo de evento; não será assumido pela SIA. A categoria
-`CLINICO_GERAL` deve ser um valor cadastrado em `dsCategoria`, sem depender de
-comparação pelo nome do tipo de evento.
+bloqueios e eventos `AGENDADO`. O tamanho de cada atendimento é uma
+configuração real do tipo de evento; não será assumido pela SIA. A modalidade
+`CLINICO_GERAL` fica em `dsModalidadeAgendamento`, separada de `dsCategoria`,
+que já representa categorias clínicas amplas.
 
 `POST /eventos` permanece a única operação que cria a consulta. Ele precisa
 revalidar bloqueio e conflito no momento da criação e devolver `409` quando o
@@ -184,8 +189,8 @@ confirmação realiza o `POST /eventos` com o Bearer original do tutor.
 
 - O Java já possui disponibilidade semanal, bloqueios e validação de conflito
   em `POST /eventos`, mas não possui uma rota que calcule slots livres.
-- O contrato atual de `GET /tipos-evento` expõe `dsCategoria`, mas não define
-  `CLINICO_GERAL` como categoria de negócio nem uma duração por tipo.
+- O contrato atual de `GET /tipos-evento` ainda não expõe a modalidade e a
+  duração por tipo até a publicação da Etapa 2 no Java.
 - A resposta atual do chat é somente `{ "mensagem": "..." }`; o aplicativo
   ainda não recebe nem renderiza blocos.
 - A ferramenta Python `consultar_disponibilidade` contém horários fixos e não
