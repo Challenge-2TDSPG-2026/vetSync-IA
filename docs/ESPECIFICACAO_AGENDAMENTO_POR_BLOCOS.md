@@ -1,6 +1,8 @@
 # Especificação — agendamento por blocos no chat SIA
 
-**Status:** especificação concluída na Etapa 1; ainda não está disponível na API.
+**Status:** implementado nos repositórios SIA, Java e Mobile. A disponibilidade
+em ambiente publicado depende da migração `V21` no Java e da publicação dos
+três serviços; este documento não confirma essa publicação.
 
 ## Objetivo
 
@@ -27,9 +29,9 @@ diagnóstico, não prescreve e não substitui a avaliação presencial.
 8. A SIA confirma a consulta somente se o Java devolver sucesso. Um conflito
    devolve novos horários; nenhuma reserva é criada antes disso.
 
-Se o tutor solicitar outro serviço, a API mostra antes o bloco
-`SELECIONAR_TIPO_ATENDIMENTO`. Somente a palavra **consulta** sem tipo explícito
-usa `CLINICO_GERAL` como padrão.
+Este primeiro recorte opera somente com `CLINICO_GERAL`. A escolha de outros
+tipos de atendimento ainda precisa ser implementada com um catálogo real do
+Java e um bloco próprio; ela não faz parte do fluxo atual.
 
 ```mermaid
 sequenceDiagram
@@ -83,8 +85,7 @@ Tipos de bloco da primeira versão:
 
 | Tipo | Quando aparece | Dados exibidos |
 | --- | --- | --- |
-| `SELECIONAR_DATA` | A mensagem não contém data compreensível | datas sugeridas e opção de calendário |
-| `SELECIONAR_TIPO_ATENDIMENTO` | O tutor pediu serviço diferente de consulta geral | tipos reais do Java |
+| `SELECIONAR_DATA` | A mensagem não contém data compreensível | três datas sugeridas |
 | `SELECIONAR_HORARIO` | Há data e tipo definidos | horário e veterinário responsável |
 | `SELECIONAR_PET` | Há slot escolhido | nome e espécie dos pets autorizados |
 | `CONFIRMAR_RESERVA` | Há slot e pet escolhidos | pet, tipo, data, horário e veterinário |
@@ -99,7 +100,7 @@ A SIA deverá manter uma sessão curta, expirada e vinculada ao tutor autenticad
 Ela contém os campos que serão usados no Java:
 
 ```text
-estado: AGUARDANDO_DATA | AGUARDANDO_TIPO | AGUARDANDO_HORARIO |
+estado: AGUARDANDO_DATA | AGUARDANDO_HORARIO |
         AGUARDANDO_PET | AGUARDANDO_CONFIRMACAO | CONCLUIDA | EXPIRADA
 idTipoEvento: obrigatório antes de consultar slots
 idVeterinario: definido pela escolha do slot
@@ -112,15 +113,15 @@ Nesta primeira implementação, a sessão fica em memória por 15 minutos e é
 perdida se a instância da SIA reiniciar. A persistência compartilhada deverá
 ser adicionada antes de executar mais de uma instância da API.
 
-Uma seleção direta não chama o orquestrador. O modelo pode ser usado apenas na
-entrada livre para reconhecer que o tutor quer agendar, extrair a data ou
-entender uma observação que não faça parte de uma escolha estruturada.
+Uma seleção direta não chama o modelo. A rota de conversa reconhece palavras
+de agendamento e resolve as datas suportadas de forma determinística; as
+opções seguintes avançam somente pela sessão.
 
 ## Contratos necessários
 
 ### Java — disponibilidade real
 
-Criar uma consulta autenticada de slots, proposta como:
+Consulta autenticada de slots implementada:
 
 ```text
 GET /agenda/slots?data=YYYY-MM-DD&modalidade=CLINICO_GERAL
@@ -155,14 +156,14 @@ slot tiver sido ocupado.
 
 ### SIA — início e seleções
 
-O endpoint de conversa permanece a entrada de texto livre. A implementação
-poderá manter `POST /api/v1/ia/orquestrador/processar` para isso, agora com o
-campo opcional `bloco` na resposta.
+O endpoint de conversa é a entrada de texto livre:
+`POST /api/v1/ia/orquestrador/processar`. A resposta inclui o campo opcional
+`bloco` quando há uma escolha estruturada.
 
-As escolhas dos blocos terão uma rota sem modelo, proposta como:
+As escolhas dos blocos usam uma rota sem modelo:
 
 ```text
-POST /api/v1/ia/agendamentos/sessoes/{sessaoId}/selecoes
+POST /api/v1/ia/orquestrador/agendamentos/sessoes/{sessaoId}/selecoes
 {
   "opcaoId": "slot-assinado"
 }
@@ -177,9 +178,9 @@ confirmação realiza o `POST /eventos` com o Bearer original do tutor.
   autorização.
 - IDs de pet, tipo e veterinário recebidos pelo aplicativo nunca são aceitos
   sem validação contra a sessão e os dados atuais do Java.
-- Uma sessão expirada ou uma opção inválida reinicia a etapa afetada com dados
-  atualizados.
-- Se não houver slots, o bloco mostra uma data alternativa obtida do Java ou
+- Uma sessão expirada ou uma opção inválida devolve uma mensagem para o tutor
+  reiniciar o agendamento e consultar os dados atuais.
+- Se não houver slots, o bloco oferece três datas locais para nova consulta e
   informa claramente a ausência de disponibilidade.
 - Se uma mensagem trouxer sintomas e pedido de consulta, a SIA envia uma
   orientação curta para avaliação presencial e mantém o fluxo de agendamento.
@@ -187,11 +188,14 @@ confirmação realiza o `POST /eventos` com o Bearer original do tutor.
 
 ## Limites atuais confirmados
 
-- O Java já possui disponibilidade semanal, bloqueios e validação de conflito
-  em `POST /eventos`, mas não possui uma rota que calcule slots livres.
-- O contrato atual de `GET /tipos-evento` ainda não expõe a modalidade e a
-  duração por tipo até a publicação da Etapa 2 no Java.
-- A resposta atual do chat é somente `{ "mensagem": "..." }`; o aplicativo
-  ainda não recebe nem renderiza blocos.
-- A ferramenta Python `consultar_disponibilidade` contém horários fixos e não
-  participa do contrato futuro.
+- As sessões ficam em memória no processo da SIA. Uma reinicialização as perde
+  e múltiplas instâncias exigem armazenamento compartilhado.
+- O fluxo implementado cobre somente `CLINICO_GERAL`. A seleção de outros
+  serviços por bloco ainda não existe.
+- A consulta de slots usa disponibilidade semanal, bloqueios e eventos
+  `AGENDADO`. O endpoint de criação deve validar também a disponibilidade
+  semanal quando receber chamadas diretas, para manter a mesma regra fora do
+  fluxo de blocos.
+- A data reconhecida no texto livre cobre hoje, amanhã, ISO e `dia N`; outras
+  formas de linguagem natural ainda precisam de uma resolução determinística
+  ou de uma interface de calendário.

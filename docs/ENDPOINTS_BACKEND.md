@@ -12,10 +12,18 @@ Atualmente, o projeto está estruturado em duas categorias principais de endpoin
 
 Estas rotas cuidam de receber os dados do front-end/tutor, interpretá-los usando a Inteligência Artificial e tomar a decisão apropriada no banco de dados (inserir, atualizar, cancelar).
 
-### Agendamentos (`SchedulingIntent`)
-*   **`POST /api/v1/ia/agendamentos/processar`**
-    *   **Objetivo:** Recebe uma mensagem em texto livre do tutor, passa pela IA para estruturar, e toma a ação no banco de dados Oracle baseada na intenção (`RESERVAR`, `CANCELAR`, `CONFIRMAR`, `CONSULTAR`).
-    *   **Exemplo de Payload:** `{"prompt": "Quero marcar consulta amanhã as 14h"}`
+### Agendamento por blocos
+* **`POST /api/v1/ia/orquestrador/processar`**
+  * **Objetivo:** inicia uma consulta de clínico geral. Com data compreensível,
+    devolve `mensagem` e um bloco `SELECIONAR_HORARIO` baseado em
+    `GET /agenda/slots` do Java.
+  * **Payload:** `{"message": "Quero marcar uma consulta amanhã"}`
+* **`POST /api/v1/ia/orquestrador/agendamentos/sessoes/{sessaoId}/selecoes`**
+  * **Objetivo:** avança uma opção previamente devolvida pela SIA sem chamar o
+    modelo. O corpo é `{"opcaoId": "uuid"}`; as escolhas possíveis são data,
+    horário, pet e confirmação.
+* **`GET /agenda/slots?data=YYYY-MM-DD&modalidade=CLINICO_GERAL`** *(Java)*
+  * **Objetivo:** lista slots livres do tutor autenticado. Não cria reserva.
 
 ### Pós-Atendimento e Prontuário (`ClinicalPostCarePlan`)
 *   **`POST /api/v1/ia/atendimentos/processar`**
@@ -24,7 +32,7 @@ Estas rotas cuidam de receber os dados do front-end/tutor, interpretá-los usand
 
 ### Conversa com o Tutor
 *   **`POST /api/v1/ia/orquestrador/processar`**
-    *   **Objetivo:** Responde de forma natural, usando o histórico e o pet ativo. Não classifica risco ou urgência e não faz diagnóstico; em dúvidas de saúde, orienta avaliação presencial na clínica.
+    *   **Objetivo:** Responde de forma natural, usando o histórico e o pet ativo. Quando a mensagem inicia agendamento, devolve blocos estruturados; não classifica risco ou urgência e não faz diagnóstico.
     *   **Exemplo de Payload:** `{"message": "A Morgana caiu da escada. Devo levá-la?", "contexto": {"pet_ativo": {"nome": "Morgana"}}}`
 
 ### Check-in Pós-Cirúrgico (`CheckinResult`)

@@ -48,7 +48,12 @@ A SIA atua diretamente na quebra dessa inércia por meio de um **Ciclo Contínuo
 Permite ao médico ditar ou digitar orientações pós-consulta. A IA extrai dias para retorno, motivos, necessidade de anexos e gera o rascunho da mensagem ao tutor.
 
 ### 2.2 Agendamento Inteligente (`/api/v1/ia/orquestrador/processar`)
-Ao iniciar um agendamento, a SIA consulta no backend Java os pets do tutor, tipos de evento e veterinários. Ela pede a escolha de **pet, tipo de atendimento, veterinário, data e horário**; a data é sempre confirmada de forma absoluta (por exemplo, `dia 20` em 18/09/2026 vira `20/09/2026`). Só depois de todos os campos serem escolhidos ela encaminha o mesmo Bearer do tutor para `POST /eventos` e confirma a consulta se o Java retornar sucesso. Nome e telefone não são pedidos porque não pertencem a esse contrato.
+O recorte atual atende consultas de **clínico geral**. Ao receber uma data, a
+SIA consulta `GET /agenda/slots` no Java e devolve `SELECIONAR_HORARIO`. Cada
+toque avança uma sessão curta vinculada ao tutor: horário, pet e confirmação.
+Somente a confirmação chama `POST /eventos` com o mesmo Bearer do tutor. Nome,
+telefone e IDs técnicos não são pedidos nem enviados pelo aplicativo. Os
+demais serviços ainda precisam de seleção por catálogo real.
 
 ### 2.3 Conversa com o Tutor (`/api/v1/ia/orquestrador/processar`)
 Mantém o histórico da conversa e o contexto do pet para responder de maneira natural. Não expõe categorias, não realiza triagem nem diagnóstico; relatos de saúde são orientados para avaliação presencial na clínica.
@@ -207,24 +212,25 @@ curl -X POST http://localhost:8000/api/v1/ia/orquestrador/processar \
 }
 ```
 
-#### 4. Agendamento Inteligente (`/api/v1/assistant/parse-scheduling`)
+#### 4. Início do Agendamento por Blocos (`/api/v1/ia/orquestrador/processar`)
 ```bash
-curl -X POST http://localhost:8000/api/v1/assistant/parse-scheduling \
+curl -X POST http://localhost:8000/api/v1/ia/orquestrador/processar \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token-do-tutor>" \
   -d '{
-    "prompt": "Gostaria de agendar uma consulta para amanhã à tarde com o Dr. Carlos para a gatinha Luna"
+    "message": "Gostaria de marcar uma consulta amanhã"
   }'
 ```
-**Resposta da IA:**
+**Resposta da SIA:**
 ```json
 {
-  "action": "RESERVAR",
-  "date_reference": "amanhã",
-  "time_reference": "tarde",
-  "doctor_name": "Dr. Carlos",
-  "patient_name": "Luna",
-  "state": "PENDENTE_DOUTOR",
-  "message_draft": "Solicitação de agendamento recebida para amanhã no período da tarde com o Dr. Carlos para a Luna. Estamos confirmando a disponibilidade."
+  "mensagem": "Encontrei horários para clínico geral em 30/09/2026.",
+  "bloco": {
+    "tipo": "SELECIONAR_HORARIO",
+    "sessaoId": "uuid",
+    "titulo": "Escolha um horário",
+    "opcoes": [{"id": "uuid", "rotulo": "12:00", "descricao": "Dra. Ana", "habilitado": true}]
+  }
 }
 ```
 

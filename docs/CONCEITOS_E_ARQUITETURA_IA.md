@@ -4,6 +4,15 @@
 **Parceira Corporativa:** Clyvo Vet  
 **Semestre:** 2º Semestre — Sprint 3  
 
+> **Estado da implementação em 29/09/2026:** as seções seguintes registram a
+> arquitetura proposta para a Sprint 3. No chat do tutor em produção de código,
+> relatos de saúde recebem somente a recomendação de avaliação presencial: não
+> há classificação de urgência, diagnóstico, prescrição nem alerta automático.
+> O agendamento implementado é determinístico para `CLINICO_GERAL`: a SIA
+> consulta slots no Java, devolve blocos de horário, pet e confirmação e cria
+> o evento apenas após o toque final. A sessão ainda é local à instância e a
+> publicação integrada depende da migração `V21` e dos serviços publicados.
+
 ---
 
 ## 1. Definição do Problema de Negócio na Jornada Contínua do Pet
@@ -58,8 +67,8 @@ A IA atua em quatro frentes especializadas de apoio à decisão:
 * **Detecção de *Red Flags*:** Avalia o tempo decorrido da cirurgia (`days_post_surgery`) contra sintomas normais vs sinais de alarme (deiscência de pontos, secreção purulenta, hipotermia, anorexia prolongada).
 * **Alerta ao Especialista:** Se `recovery_status == 'COMPLICACAO_CRITICA'`, dispara alerta imediato para o médico responsável.
 
-### 2.3 Agendamento Conversacional com *Function Calling* (`/api/v1/assistant/parse-scheduling`)
-* Através de chamadas automáticas de função (`consultar_disponibilidade`), a IA consulta agendas reais e responde propondo horários viáveis sem alucinação.
+### 2.3 Agendamento por blocos (`/api/v1/ia/orquestrador/processar`)
+* O fluxo atual consulta `GET /agenda/slots?data=YYYY-MM-DD&modalidade=CLINICO_GERAL` no Java e devolve escolhas estruturadas. Depois do texto inicial, a escolha de horário, pet e confirmação não usa o modelo.
 
 ### 2.4 Pós-Atendimento e Alta (`/api/v1/assistant/parse-intent`)
 * Estrutura data de retorno, necessidade de anexos de receitas e prontuários, e produz uma minuta de mensagem personalizada para envio via WhatsApp ou E-mail.
