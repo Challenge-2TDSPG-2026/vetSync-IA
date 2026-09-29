@@ -40,6 +40,22 @@ class JavaVetSyncClient:
     def create_event(self, bearer_token: str, payload: dict[str, Any]) -> dict[str, Any]:
         return self._request("POST", "/eventos", bearer_token, json=payload)
 
+    def available_slots(self, bearer_token: str, data: str, modalidade: str = "CLINICO_GERAL") -> dict[str, Any]:
+        """Consulta slots calculados pelo Java sem criar uma reserva."""
+        return self._request(
+            "GET",
+            "/agenda/slots",
+            bearer_token,
+            params={"data": data, "modalidade": modalidade},
+        )
+
+    def list_pets(self, bearer_token: str) -> list[dict[str, Any]]:
+        """Lista apenas os pets autorizados para o tutor autenticado."""
+        result = self._get("/pets", bearer_token)
+        if not isinstance(result, list):
+            raise JavaVetSyncError("A API Java devolveu uma lista de pets inválida.")
+        return result
+
     def _get(self, path: str, bearer_token: str) -> Any:
         return self._request("GET", path, bearer_token)
 

@@ -7,8 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
+from application.booking_flow import BookingFlowError, BookingFlowService, BookingSessionStore
 from infrastructure.auth.security import verificar_token_externo
 from infrastructure.gemini_gateway import GeminiGateway
+from application.ports import AssistantGatewayError
 from infrastructure.java_vetsync_client import (
     JavaVetSyncClient,
     JavaVetSyncConflictError,
@@ -24,12 +26,29 @@ class MensagemChatRequest(BaseModel):
     message: str
     contexto: Optional[dict] = None
 
-def get_gemini_gateway() -> GeminiGateway:
-    return GeminiGateway()
+
+class SelecaoBlocoRequest(BaseModel):
+    opcaoId: str
+
+def get_gemini_gateway() -> GeminiGateway | None:
+    """O agendamento por blocos não depende do Gemini depois de iniciado."""
+    try:
+        return GeminiGateway()
+    except AssistantGatewayError:
+        return None
 
 
 def get_java_vetsync_client() -> JavaVetSyncClient:
     return JavaVetSyncClient()
+
+
+booking_session_store = BookingSessionStore()
+
+
+def get_booking_flow(
+    java_client: JavaVetSyncClient = Depends(get_java_vetsync_client),
+) -> BookingFlowService:
+    return BookingFlowService(java_client, booking_session_store)
 
 
 def is_scheduling_turn(message: str, context: dict) -> bool:
@@ -119,8 +138,8 @@ def confirmation_message(evento: dict, catalogos: dict) -> str:
 def processar_chat_universal(
     request: MensagemChatRequest,
     usuario_logado: dict = Depends(verificar_token_externo),
-    gateway: GeminiGateway = Depends(get_gemini_gateway),
-    java_client: JavaVetSyncClient = Depends(get_java_vetsync_client),
+    gateway: GeminiGateway | None = Depends(get_gemini_gateway),
+    booking_flow: BookingFlowService = Depends(get_booking_flow),
 ):
     """
     Entrada conversacional da SIA para o tutor.
@@ -131,44 +150,67 @@ def processar_chat_universal(
         contexto_enriquecido = dict(request.contexto or {})
         contexto_enriquecido["tutor_id"] = usuario_logado["username"]
 
-        # Mantém a compatibilidade para gateways de conversa simples e para os
-        # testes legados; o Gemini real usa o fluxo estruturado abaixo.
-        if not hasattr(gateway, "decidir_agendamento_tutor") or not is_scheduling_turn(request.message, contexto_enriquecido):
+        # Gateways usados nos testes legados preservam o contrato anterior.
+        # O fluxo real evita o modelo após o primeiro pedido de agendamento.
+        if is_scheduling_turn(request.message, contexto_enriquecido) and (
+            gateway is None or isinstance(gateway, GeminiGateway)
+        ):
+            return booking_flow.start(
+                request.message,
+                usuario_logado["username"],
+                usuario_logado.get("token", ""),
+            ).to_payload()
+
+        # Compatibilidade com os gateways estruturados usados pela suíte legada.
+        if is_scheduling_turn(request.message, contexto_enriquecido) and hasattr(gateway, "decidir_agendamento_tutor"):
+            try:
+                catalogos = booking_flow.java_client.scheduling_context(usuario_logado.get("token", ""))
+            except JavaVetSyncError:
+                return {"mensagem": "Não consegui consultar os dados da agenda agora. Tente novamente em instantes para eu continuar o agendamento."}
+            decision = gateway.decidir_agendamento_tutor(request.message, contexto_enriquecido, catalogos)
+            decision.dt_evento = normalize_explicit_day(request.message, decision.dt_evento)
+            if not decision.create_event:
+                return {"mensagem": decision.message}
+            payload = validate_event_choice(decision, catalogos)
+            if not payload:
+                return {"mensagem": "Para confirmar, preciso da escolha do animal, tipo de atendimento, veterinário, data e horário. Qual desses dados falta informar?"}
+            try:
+                evento = booking_flow.java_client.create_event(usuario_logado["token"], payload)
+            except JavaVetSyncConflictError:
+                return {"mensagem": "Esse horário acabou de ficar indisponível. Escolha outro horário para eu tentar reservar."}
+            except JavaVetSyncError:
+                return {"mensagem": "Não consegui confirmar a reserva agora. Nenhuma consulta foi agendada; tente novamente em instantes."}
+            return {"mensagem": confirmation_message(evento, catalogos)}
+
+        if gateway is None:
+            return {"mensagem": "Não consegui iniciar a conversa agora. Tente novamente em instantes."}
+
+        if not is_scheduling_turn(request.message, contexto_enriquecido):
             mensagem = gateway.responder_ao_tutor(request.message, contexto_enriquecido)
             return {"mensagem": mensagem}
 
-        try:
-            catalogos = java_client.scheduling_context(usuario_logado.get("token", ""))
-        except JavaVetSyncError:
-            return {
-                "mensagem": (
-                    "Não consegui consultar os dados da agenda agora. "
-                    "Tente novamente em instantes para eu continuar o agendamento."
-                )
-            }
-
-        contexto_enriquecido["pets_cadastrados"] = catalogos["pets"]
-        decision = gateway.decidir_agendamento_tutor(request.message, contexto_enriquecido, catalogos)
-        decision.dt_evento = normalize_explicit_day(request.message, decision.dt_evento)
-        if not decision.create_event:
-            return {"mensagem": decision.message}
-
-        payload = validate_event_choice(decision, catalogos)
-        if not payload:
-            return {
-                "mensagem": (
-                    "Para confirmar, preciso da escolha do animal, tipo de atendimento, "
-                    "veterinário, data e horário. Qual desses dados falta informar?"
-                )
-            }
-        try:
-            evento = java_client.create_event(usuario_logado["token"], payload)
-        except JavaVetSyncConflictError:
-            return {"mensagem": "Esse horário acabou de ficar indisponível. Escolha outro horário para eu tentar reservar."}
-        except JavaVetSyncError:
-            return {"mensagem": "Não consegui confirmar a reserva agora. Nenhuma consulta foi agendada; tente novamente em instantes."}
-
-        mensagem = confirmation_message(evento, catalogos)
+        mensagem = gateway.responder_ao_tutor(request.message, contexto_enriquecido)
         return {"mensagem": mensagem}
+    except BookingFlowError as e:
+        return {"mensagem": str(e)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro no orquestrador: {str(e)}")
+
+
+@router.post("/agendamentos/sessoes/{sessao_id}/selecoes")
+def selecionar_bloco_agendamento(
+    sessao_id: str,
+    request: SelecaoBlocoRequest,
+    usuario_logado: dict = Depends(verificar_token_externo),
+    booking_flow: BookingFlowService = Depends(get_booking_flow),
+):
+    """Avança uma escolha do agendamento sem enviar a seleção ao Gemini."""
+    try:
+        return booking_flow.select(
+            sessao_id,
+            request.opcaoId,
+            usuario_logado["username"],
+            usuario_logado.get("token", ""),
+        ).to_payload()
+    except BookingFlowError as e:
+        return {"mensagem": str(e)}
