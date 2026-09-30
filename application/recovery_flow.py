@@ -116,7 +116,11 @@ class RecoveryFlowService:
         options = [
             BookingOption(
                 action="PET",
-                data={"idPet": pet["idPet"], "nmPet": pet["nmPet"]},
+                data={
+                    "idPet": pet["idPet"],
+                    "nmPet": pet["nmPet"],
+                    "sexo": self._pet_sex(pet),
+                },
                 label=pet["nmPet"],
                 description=pet.get("nmEspecie") or pet.get("especie"),
             )
@@ -241,11 +245,12 @@ class RecoveryFlowService:
 
     def _question_for(self, session: RecoverySession) -> str:
         pet = session.selected["nmPet"]
+        pronoun = self._subject_pronoun(session)
         latest = session.selected.get("latest_event")
         if not latest:
             return (
                 f"Não encontrei um atendimento concluído de {pet} para usar como referência. "
-                "Como ele está hoje?"
+                f"Como {pronoun} está hoje?"
             )
         event_type = latest.get("nmTipoEvento") or "atendimento"
         event_date = self._format_date(latest.get("dtEvento"))
@@ -253,7 +258,7 @@ class RecoveryFlowService:
         clinic = latest.get("nmClinica")
         place = self._place(professional, clinic)
         detail = self._event_detail(latest)
-        focus = self._focus_question(detail)
+        focus = self._focus_question(detail, pronoun)
         message = f"O último atendimento concluído de {pet} foi {event_type} em {event_date}{place}."
         if detail:
             message += f" No registro consta: {detail}."
@@ -285,8 +290,9 @@ class RecoveryFlowService:
 
     def _clarify_message(self, session: RecoverySession) -> str:
         pet = session.selected["nmPet"]
+        pronoun = self._subject_pronoun(session)
         return (
-            f"Entendi. Para eu orientar o próximo passo para {pet}, ele parece estar melhor, igual ou pior desde esse atendimento? "
+            f"Entendi. Para eu orientar o próximo passo para {pet}, {pronoun} parece estar melhor, igual ou pior desde esse atendimento? "
             "Não consigo avaliar clinicamente pelo chat."
         )
 
@@ -319,19 +325,32 @@ class RecoveryFlowService:
                 return value.strip()
         return None
 
-    def _focus_question(self, detail: str | None) -> str:
+    def _focus_question(self, detail: str | None, pronoun: str) -> str:
         normalized = self._normalize(detail or "")
         if "manc" in normalized:
-            return "Ele ainda está mancando?"
+            return f"{pronoun.capitalize()} ainda está mancando?"
         if "vomit" in normalized:
-            return "Ele ainda apresentou vômitos?"
+            return f"{pronoun.capitalize()} ainda apresentou vômitos?"
         if "diarre" in normalized:
-            return "Ele ainda está com diarreia?"
+            return f"{pronoun.capitalize()} ainda está com diarreia?"
         if any(word in normalized for word in ("cirurg", "incis", "ponto")):
-            return "Como ele está desde o procedimento?"
+            return f"Como {pronoun} está desde o procedimento?"
         if detail:
-            return "Como ele está desde esse atendimento?"
-        return "Como ele está desde então?"
+            return f"Como {pronoun} está desde esse atendimento?"
+        return f"Como {pronoun} está desde então?"
+
+    @staticmethod
+    def _pet_sex(pet: dict[str, Any]) -> Any:
+        return pet.get("sexo") or pet.get("dsSexo") or pet.get("nmSexo")
+
+    @staticmethod
+    def _subject_pronoun(session: RecoverySession) -> str:
+        sex = str(session.selected.get("sexo") or "").strip().upper()
+        if sex in ("F", "FEMEA", "FÊMEA", "FEMININO"):
+            return "ela"
+        if sex in ("M", "MACHO", "MASCULINO"):
+            return "ele"
+        return "o pet"
 
     @staticmethod
     def _normalize(value: str) -> str:
