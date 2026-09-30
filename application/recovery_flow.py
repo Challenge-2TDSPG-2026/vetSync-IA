@@ -80,6 +80,19 @@ class RecoverySessionStore:
             session.expires_at = datetime.now(BOOKING_TIMEZONE) + timedelta(minutes=15)
             return session
 
+    def finish_active_for(self, tutor_id: str) -> bool:
+        """Encerra a pergunta pendente quando o tutor muda de assunto."""
+        with self._lock:
+            self._cleanup()
+            candidates = [
+                session for session in self._sessions.values()
+                if session.tutor_id == tutor_id and session.state == "AGUARDANDO_RELATO"
+            ]
+            if not candidates:
+                return False
+            max(candidates, key=lambda item: item.expires_at).state = "CONCLUIDA"
+            return True
+
     def _cleanup(self) -> None:
         now = datetime.now(BOOKING_TIMEZONE)
         for session_id in [key for key, value in self._sessions.items() if value.expires_at <= now]:
@@ -147,6 +160,12 @@ class RecoveryFlowService:
         if not session:
             return None
         normalized = self._normalize(report)
+        if self._declines_report(normalized):
+            session.state = "CONCLUIDA"
+            return RecoveryResponse(
+                "Tudo bem. Não preciso dessa informação para ajudar com o próximo passo. "
+                "Se quiser, posso marcar uma consulta para você."
+            )
         if self._indicates_not_better(normalized):
             session.state = "CONCLUIDA"
             return RecoveryResponse(self._not_better_message(session))
@@ -157,6 +176,9 @@ class RecoveryFlowService:
             session.state = "CONCLUIDA"
             return RecoveryResponse(self._better_message(session))
         return RecoveryResponse(self._clarify_message(session))
+
+    def finish_pending_report(self, tutor_id: str) -> bool:
+        return self.sessions.finish_active_for(tutor_id)
 
     def _set_block(
         self,
@@ -327,6 +349,18 @@ class RecoveryFlowService:
     def _indicates_better(self, text: str) -> bool:
         positive = ("melhor", "bem", "normal", "recuper", "parou", "sumiu")
         return any(term in text for term in positive)
+
+    @staticmethod
+    def _declines_report(text: str) -> bool:
+        phrases = (
+            "nao quero informar",
+            "nao quero mais informar",
+            "nao quero responder",
+            "nao quero falar",
+            "prefiro nao informar",
+            "prefiro nao responder",
+        )
+        return any(phrase in text for phrase in phrases)
 
     @staticmethod
     def _format_date(raw: Any) -> str:

@@ -165,17 +165,25 @@ def processar_chat_universal(
         contexto_enriquecido = dict(request.contexto or {})
         contexto_enriquecido["tutor_id"] = usuario_logado["username"]
 
-        recovery_response = recovery_flow.respond_to_report(usuario_logado["username"], request.message)
-        if recovery_response:
-            return recovery_response.to_payload()
-        if is_recovery_turn(request.message):
+        # Um pedido explícito de consulta tem prioridade sobre uma pergunta de
+        # acompanhamento pendente. Sem isso, a sessão anterior sequestra a
+        # intenção do tutor e insiste em pedir o relato clínico.
+        scheduling_message = is_scheduling_turn(request.message, {})
+        scheduling_conversation = is_scheduling_turn(request.message, contexto_enriquecido)
+        if scheduling_message:
+            recovery_flow.finish_pending_report(usuario_logado["username"])
+        else:
+            recovery_response = recovery_flow.respond_to_report(usuario_logado["username"], request.message)
+            if recovery_response:
+                return recovery_response.to_payload()
+        if not scheduling_message and is_recovery_turn(request.message):
             return recovery_flow.start(
                 usuario_logado["username"], usuario_logado.get("token", "")
             ).to_payload()
 
         # Gateways usados nos testes legados preservam o contrato anterior.
         # O fluxo real evita o modelo após o primeiro pedido de agendamento.
-        if is_scheduling_turn(request.message, contexto_enriquecido) and (
+        if scheduling_message and (
             gateway is None or isinstance(gateway, GeminiGateway)
         ):
             return booking_flow.start(
@@ -185,7 +193,7 @@ def processar_chat_universal(
             ).to_payload()
 
         # Compatibilidade com os gateways estruturados usados pela suíte legada.
-        if is_scheduling_turn(request.message, contexto_enriquecido) and hasattr(gateway, "decidir_agendamento_tutor"):
+        if scheduling_conversation and hasattr(gateway, "decidir_agendamento_tutor"):
             try:
                 catalogos = booking_flow.java_client.scheduling_context(usuario_logado.get("token", ""))
             except JavaVetSyncError:
@@ -208,7 +216,7 @@ def processar_chat_universal(
         if gateway is None:
             return {"mensagem": "Não consegui iniciar a conversa agora. Tente novamente em instantes."}
 
-        if not is_scheduling_turn(request.message, contexto_enriquecido):
+        if not scheduling_conversation:
             mensagem = gateway.responder_ao_tutor(request.message, contexto_enriquecido)
             return {"mensagem": mensagem}
 
