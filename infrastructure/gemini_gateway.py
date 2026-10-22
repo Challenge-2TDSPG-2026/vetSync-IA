@@ -161,6 +161,34 @@ Saudações e temas fora da clínica devem receber respostas humanas, breves e e
         except Exception as e:
             raise AssistantGatewayError(f"Erro ao responder o tutor no Gemini: {str(e)}")
 
+    def preparar_consulta(self, relato: str, nome_pet: str) -> dict:
+        """Organiza apenas o relato do tutor; o resultado é um rascunho, não um registro clínico."""
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_id,
+                contents=f"Pet: {nome_pet}\nRelato do tutor: {relato}",
+                config=types.GenerateContentConfig(
+                    system_instruction=(
+                        "Organize o relato do tutor para uma consulta veterinária. "
+                        "Retorne JSON com chaves resumo (texto), pontos (lista de textos) e perguntas (lista de textos). "
+                        "Inclua somente fatos relatados e dúvidas para levar ao veterinário. "
+                        "Não diagnostique, classifique gravidade, prescreva, invente fatos ou recomende medicamentos. "
+                        "Quando faltarem dados, formule uma pergunta em vez de completar a lacuna."
+                    ),
+                    response_mime_type="application/json",
+                    temperature=0.1,
+                ),
+            )
+            result = json.loads(response.text or "")
+            if not isinstance(result, dict) or not isinstance(result.get("resumo"), str):
+                raise ValueError("resposta estrutural inválida")
+            for key in ("pontos", "perguntas"):
+                if not isinstance(result.get(key), list) or not all(isinstance(x, str) for x in result[key]):
+                    raise ValueError("lista estrutural inválida")
+            return result
+        except Exception as exc:
+            raise AssistantGatewayError("Não foi possível preparar o resumo agora.") from exc
+
     def decidir_agendamento_tutor(
         self, prompt: str, context: dict, catalogos: dict
     ) -> SchedulingConversationDecision:
