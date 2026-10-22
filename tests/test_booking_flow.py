@@ -80,11 +80,43 @@ def test_checkup_tomorrow_follows_slots_pet_confirmation_and_creation():
         "dtEvento": expected_date,
         "hrEvento": "12:00",
         "dsObservacao": None,
+        "requestId": slots.block["sessaoId"],
     }
 
 
 def test_checkup_is_recognized_as_a_scheduling_turn():
     assert is_scheduling_turn("Quero marcar um check-up amanhã", {})
+
+
+def test_booking_selection_survives_new_flow_instance(monkeypatch):
+    monkeypatch.setenv("BOOKING_SESSION_SIGNING_KEY", "test-signing-key-only")
+    class PersistentJava(FakeJavaAgenda):
+        def __init__(self):
+            super().__init__()
+            self.sessions = {}
+
+        def save_booking_session(self, token, session_id, payload):
+            assert token == "token-do-tutor"
+            self.sessions[session_id] = payload
+            return payload
+
+        def get_booking_session(self, token, session_id):
+            assert token == "token-do-tutor"
+            return self.sessions[session_id]
+
+    java = PersistentJava()
+    first = BookingFlowService(java, BookingSessionStore(java))
+    slots = first.start("Quero marcar uma consulta amanhã", "felipe", "token-do-tutor")
+
+    second = BookingFlowService(java, BookingSessionStore(java))
+    pets = second.select(slots.block["sessaoId"], option_id(slots.block, "12:00"), "felipe", "token-do-tutor")
+    assert pets.block["tipo"] == "SELECIONAR_PET"
+    stored = java.sessions[slots.block["sessaoId"]]
+    stored["dados"] = stored["dados"].replace("AGUARDANDO_PET", "CONCLUIDA")
+    with pytest.raises(BookingFlowError, match="inválida"):
+        BookingFlowService(java, BookingSessionStore(java)).select(
+            slots.block["sessaoId"], option_id(pets.block, "Ayla"), "felipe", "token-do-tutor"
+        )
 
 
 def test_health_guidance_is_preserved_when_availability_fails():

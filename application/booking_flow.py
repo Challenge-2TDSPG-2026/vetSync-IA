@@ -7,8 +7,12 @@ mantém as opções que vieram do Java e cada escolha é validada contra ela.
 from __future__ import annotations
 
 import re
+import json
+import os
+import hmac
+import hashlib
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from threading import RLock
 from typing import Any
 from uuid import uuid4
@@ -50,11 +54,18 @@ class BookingSession:
 class BookingSessionStore:
     """Armazena sessões de curta duração no processo da SIA."""
 
-    def __init__(self) -> None:
+    def __init__(self, java_client: JavaVetSyncClient | None = None) -> None:
         self._sessions: dict[str, BookingSession] = {}
         self._lock = RLock()
+        self.java_client = java_client
 
-    def create(self, tutor_id: str) -> BookingSession:
+    def _signing_key(self) -> bytes:
+        value = os.getenv("BOOKING_SESSION_SIGNING_KEY") or os.getenv("AUTH_JWT_SECRET")
+        if not value:
+            raise BookingFlowError("Assinatura das sessões de agendamento não configurada.")
+        return value.encode("utf-8")
+
+    def create(self, tutor_id: str, bearer_token: str = "") -> BookingSession:
         with self._lock:
             self._cleanup()
             session = BookingSession(
@@ -63,16 +74,57 @@ class BookingSessionStore:
                 expires_at=datetime.now(BOOKING_TIMEZONE) + SESSION_TTL,
             )
             self._sessions[session.id] = session
+            try:
+                self.save(session, bearer_token)
+            except JavaVetSyncError as exc:
+                self._sessions.pop(session.id, None)
+                raise BookingFlowError("Não consegui iniciar o agendamento agora. Tente novamente em instantes.") from exc
             return session
 
-    def get(self, session_id: str, tutor_id: str) -> BookingSession:
+    def get(self, session_id: str, tutor_id: str, bearer_token: str = "") -> BookingSession:
         with self._lock:
             self._cleanup()
-            session = self._sessions.get(session_id)
+            if self.java_client:
+                try:
+                    raw = self.java_client.get_booking_session(bearer_token, session_id)
+                    envelope = json.loads(raw["dados"])
+                    encoded = json.dumps(envelope["payload"], ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+                    expected = hmac.new(self._signing_key(), encoded.encode("utf-8"), hashlib.sha256).hexdigest()
+                    if not hmac.compare_digest(expected, envelope["signature"]):
+                        raise BookingFlowError("Essa etapa de agendamento é inválida. Comece novamente.")
+                    data = envelope["payload"]
+                    if data.get("id") != session_id or datetime.fromisoformat(data["expires_at"]) != datetime.fromisoformat(raw["expiraEm"]):
+                        raise BookingFlowError("Essa etapa de agendamento é inválida. Comece novamente.")
+                    session = BookingSession(
+                        id=session_id, tutor_id=data["tutor_id"],
+                        expires_at=datetime.fromisoformat(raw["expiraEm"]).replace(tzinfo=timezone.utc),
+                        state=data["state"], selected=data["selected"],
+                        options={key: BookingOption(**value) for key, value in data["options"].items()},
+                    )
+                except (JavaVetSyncError, KeyError, TypeError, ValueError) as exc:
+                    raise BookingFlowError("Essa etapa de agendamento expirou. Comece novamente para consultar os horários atuais.") from exc
+            else:
+                session = self._sessions.get(session_id)
             if not session or session.tutor_id != tutor_id:
                 raise BookingFlowError("Essa etapa de agendamento expirou. Comece novamente para consultar os horários atuais.")
             session.expires_at = datetime.now(BOOKING_TIMEZONE) + SESSION_TTL
             return session
+
+    def save(self, session: BookingSession, bearer_token: str = "") -> None:
+        if not self.java_client:
+            return
+        data = {
+            "id": session.id, "tutor_id": session.tutor_id, "state": session.state,
+            "selected": session.selected,
+            "options": {key: vars(value) for key, value in session.options.items()},
+        }
+        expiry = session.expires_at.astimezone(timezone.utc).replace(tzinfo=None).isoformat()
+        data["expires_at"] = expiry
+        encoded = json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        signature = hmac.new(self._signing_key(), encoded.encode("utf-8"), hashlib.sha256).hexdigest()
+        self.java_client.save_booking_session(bearer_token, session.id, {
+            "id": session.id, "dados": json.dumps({"payload": data, "signature": signature}, ensure_ascii=False), "expiraEm": expiry,
+        })
 
     def _cleanup(self) -> None:
         now = datetime.now(BOOKING_TIMEZONE)
@@ -99,36 +151,44 @@ class BookingFlowService:
         self.sessions = sessions or BookingSessionStore()
 
     def start(self, message: str, tutor_id: str, bearer_token: str) -> BookingFlowResponse:
-        session = self.sessions.create(tutor_id)
+        session = self.sessions.create(tutor_id, bearer_token)
         health_prefix = self._health_prefix(message)
         session.selected["health_prefix"] = health_prefix
         requested_date = self._resolve_date(message)
         if not requested_date:
-            return self._show_date_options(session, f"{health_prefix}Para qual dia você quer a consulta?")
+            return self._persist(session, bearer_token, self._show_date_options(session, f"{health_prefix}Para qual dia você quer a consulta?"))
 
         session.selected["date"] = requested_date.isoformat()
-        return self._show_general_slots(session, bearer_token, health_prefix)
+        return self._persist(session, bearer_token, self._show_general_slots(session, bearer_token, health_prefix))
 
     def select(self, session_id: str, option_id: str, tutor_id: str, bearer_token: str) -> BookingFlowResponse:
-        session = self.sessions.get(session_id, tutor_id)
+        session = self.sessions.get(session_id, tutor_id, bearer_token)
         option = session.options.get(option_id)
         if not option:
             raise BookingFlowError("Essa opção não é mais válida. Escolha uma das opções atuais.")
 
         if option.action == "DATE":
             session.selected["date"] = option.data["date"]
-            return self._show_general_slots(session, bearer_token, session.selected.get("health_prefix", ""))
+            return self._persist(session, bearer_token, self._show_general_slots(session, bearer_token, session.selected.get("health_prefix", "")))
         if option.action == "SLOT":
             session.selected.update(option.data)
-            return self._show_pet_options(session, bearer_token)
+            return self._persist(session, bearer_token, self._show_pet_options(session, bearer_token))
         if option.action == "PET":
             session.selected.update(option.data)
-            return self._show_confirmation(session)
+            return self._persist(session, bearer_token, self._show_confirmation(session))
         if option.action == "CONFIRM":
-            return self._confirm(session, bearer_token)
+            return self._persist(session, bearer_token, self._confirm(session, bearer_token))
         if option.action == "CHANGE_SLOT":
-            return self._show_general_slots(session, bearer_token, "Escolha outro horário para a consulta. ")
+            return self._persist(session, bearer_token, self._show_general_slots(session, bearer_token, "Escolha outro horário para a consulta. "))
         raise BookingFlowError("Não reconheci essa escolha de agendamento.")
+
+    def _persist(self, session: BookingSession, bearer_token: str, response: BookingFlowResponse) -> BookingFlowResponse:
+        try:
+            self.sessions.save(session, bearer_token)
+        except JavaVetSyncError as exc:
+            if session.state != "CONCLUIDA":
+                raise BookingFlowError("Não consegui salvar esta etapa do agendamento. Tente novamente.") from exc
+        return response
 
     def _show_date_options(self, session: BookingSession, message: str) -> BookingFlowResponse:
         today = datetime.now(BOOKING_TIMEZONE).date()
@@ -246,6 +306,7 @@ class BookingFlowService:
             "dtEvento": selected["date"],
             "hrEvento": selected["hrEvento"],
             "dsObservacao": selected.get("dsObservacao"),
+            "requestId": session.id,
         }
         try:
             event = self.java_client.create_event(bearer_token, payload)

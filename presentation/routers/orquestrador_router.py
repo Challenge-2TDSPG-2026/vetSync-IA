@@ -43,14 +43,13 @@ def get_java_vetsync_client() -> JavaVetSyncClient:
     return JavaVetSyncClient()
 
 
-booking_session_store = BookingSessionStore()
 recovery_session_store = RecoverySessionStore()
 
 
 def get_booking_flow(
     java_client: JavaVetSyncClient = Depends(get_java_vetsync_client),
 ) -> BookingFlowService:
-    return BookingFlowService(java_client, booking_session_store)
+    return BookingFlowService(java_client, BookingSessionStore(java_client))
 
 
 def get_recovery_flow(

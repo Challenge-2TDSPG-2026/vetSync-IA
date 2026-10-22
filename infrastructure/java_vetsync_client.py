@@ -21,6 +21,10 @@ class JavaVetSyncConflictError(JavaVetSyncError):
     pass
 
 
+class JavaVetSyncAccessError(JavaVetSyncError):
+    pass
+
+
 @dataclass
 class JavaVetSyncClient:
     base_url: str | None = None
@@ -63,6 +67,33 @@ class JavaVetSyncClient:
             raise JavaVetSyncError("A API Java devolveu uma lista de eventos inválida.")
         return result
 
+    def get_pet(self, bearer_token: str, pet_id: int) -> dict[str, Any]:
+        return self._get(f"/pets/{pet_id}", bearer_token)
+
+    def get_event_details(self, bearer_token: str, event_id: int) -> dict[str, Any]:
+        return self._get(f"/eventos/{event_id}/detalhes", bearer_token)
+
+    def get_event_guidance(self, bearer_token: str, event_id: int) -> list[dict[str, Any]]:
+        result = self._get(f"/eventos/{event_id}/orientacoes", bearer_token)
+        if not isinstance(result, list):
+            raise JavaVetSyncError("A API Java devolveu orientações inválidas.")
+        return result
+
+    def get_record(self, bearer_token: str, pet_id: int) -> dict[str, Any]:
+        return self._get(f"/pets/{pet_id}/prontuario?secoes=ORIENTACOES,RECEITAS", bearer_token)
+
+    def get_pet_plans(self, bearer_token: str, pet_id: int) -> list[dict[str, Any]]:
+        result = self._get(f"/planos/pet/{pet_id}", bearer_token)
+        if not isinstance(result, list):
+            raise JavaVetSyncError("A API Java devolveu planos inválidos.")
+        return result
+
+    def save_booking_session(self, bearer_token: str, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._request("PUT", f"/sia/agendamentos/sessoes/{session_id}", bearer_token, json=payload)
+
+    def get_booking_session(self, bearer_token: str, session_id: str) -> dict[str, Any]:
+        return self._get(f"/sia/agendamentos/sessoes/{session_id}", bearer_token)
+
     def _get(self, path: str, bearer_token: str) -> Any:
         return self._request("GET", path, bearer_token)
 
@@ -85,6 +116,8 @@ class JavaVetSyncClient:
 
         if response.status_code == 409:
             raise JavaVetSyncConflictError("O horário acabou de ser ocupado ou está bloqueado.")
+        if response.status_code in (401, 403):
+            raise JavaVetSyncAccessError("Acesso não autorizado pelo backend Java.")
         if response.is_error:
             raise JavaVetSyncError("A agenda da clínica não pôde concluir esta solicitação agora.")
 
