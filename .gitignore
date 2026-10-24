@@ -5,4 +5,3 @@ __pycache__/
 *.pyc
 .pytest_cache/
 dev_database.db
-scripts/

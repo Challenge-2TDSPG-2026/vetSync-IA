@@ -15,7 +15,10 @@ app = FastAPI(
 # Aceita o app publicado e servidores locais em qualquer porta de desenvolvimento.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://vetsync-theta.vercel.app"],
+    allow_origins=[
+        "https://vetsync-theta.vercel.app",
+        "https://vet-sync-mobile.vercel.app",
+    ],
     allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
